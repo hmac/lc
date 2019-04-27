@@ -1,24 +1,21 @@
 module Main where
 
-import Prelude
+import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&))
 import Effect (Effect)
 import Effect.Console (log)
-import Data.Monoid (mempty)
 import Data.Either
-import Data.Maybe
-import Data.String.Utils hiding (filter)
-import Data.List
-import Data.Traversable
+import Data.String.Utils (lines)
+import Data.List (List(..), filter, fromFoldable, reverse)
+import Data.Traversable (traverse)
 import Data.String (null)
-import Data.Tuple
+import Data.Tuple (Tuple)
 import Data.Bifunctor (lmap)
 import Data.Map as Map
 import Data.Map (Map)
 import Data.String.Regex (regex, test)
 
-import Expr
+import Expr (Expr, nf)
 import Parse (parseExpr, parseAssign)
-import Text.Parsing.Parser (ParseError)
 
 main :: Effect Unit
 main = log "app loaded"
