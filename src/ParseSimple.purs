@@ -1,6 +1,6 @@
 module ParseSimple (parseExpr, parseAssign) where
 
-import Prelude (bind, otherwise, pure, ($), (-), (<), (<$>), (<<<), (<>), discard, (*>))
+import Prelude (bind, otherwise, pure, ($), (-), (<), (<$>), (<<<), (<>), discard, (*>), (==))
 
 import Text.Parsing.Parser (Parser, ParseError, runParser, fail)
 import Text.Parsing.Parser.Combinators (between, sepBy1, option)
@@ -66,7 +66,7 @@ succ (Fn _ _ _ (Fn _ _ _ n)) = Fn U "f" (Arr (T "N") (T "N")) (Fn U "x" (T "N") 
 
 func :: Parser String Expr -> Parser String Expr
 func p = do
-  _ <- string "\\"
+  _ <- (string "\\" <|> string "λ")
   v <- ident
   skipSpaces
   t <- option U (string ":" *> skipSpaces *> annotation)

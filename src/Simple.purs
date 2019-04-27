@@ -17,7 +17,8 @@ instance showAnn :: Show Ann where
   show (T t) = t
   show (Arr (T t1) t2) = t1 <> " -> " <> show t2
   show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
-  show U = "U"
+  show U = "?"
+
 
 data Expr = Fn Ann String Ann Expr -- Fn (fn type) (var name) (var type) (body)
           | Var Ann String
@@ -25,10 +26,24 @@ data Expr = Fn Ann String Ann Expr -- Fn (fn type) (var name) (var type) (body)
 
 derive instance eqExpr :: Eq Expr
 
-instance showExpr :: Show Expr where
-  show (Var a v) = v <> " : " <> show a
-  show (Fn a v va e) = "(λ" <> v <> " : " <> show va <> ". " <> show e <> ")" <> " : " <> show a
-  show (App a x y) = "((" <> show x <> ") (" <> show y <> "))" <> " : " <> show a
+instance showExpr_ :: Show Expr where
+  show = showExpr ShowUTypes
+
+data ShowOption = ShowUTypes | HideUTypes
+showExpr :: ShowOption -> Expr -> String
+showExpr HideUTypes (Var U v) = v
+showExpr HideUTypes (Fn U v va e) =
+  "(λ" <> (showExpr HideUTypes (Var va v)) <> ". " <> showExpr HideUTypes e <> ")"
+showExpr HideUTypes (App U x y) =
+  "((" <> showExpr HideUTypes x <> ") (" <> showExpr HideUTypes y <> "))"
+
+showExpr HideUTypes x = showExpr ShowUTypes x
+
+showExpr ShowUTypes (Var a v) = v <> " : " <> show a
+showExpr ShowUTypes (Fn a v va e) =
+  "(λ" <> v <> " : " <> show va <> ". " <> show e <> ")" <> " : " <> show a
+showExpr ShowUTypes (App a x y) =
+  "((" <> show x <> ") (" <> show y <> "))" <> " : " <> show a
 
 -- TODO: we'll need to be able to parse and represent type annotations
 convert :: E.Expr -> Expr
