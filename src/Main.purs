@@ -1,6 +1,6 @@
 module Main where
 
-import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&))
+import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&), (<<<), (<>), map)
 import Effect (Effect)
 import Effect.Console (log)
 import Data.Either
@@ -8,36 +8,73 @@ import Data.String.Utils (lines)
 import Data.List (List(..), filter, fromFoldable, reverse)
 import Data.Traversable (traverse)
 import Data.String (null)
-import Data.Tuple (Tuple)
-import Data.Bifunctor (lmap)
+import Data.Tuple (Tuple(..))
+import Data.Bifunctor (lmap, rmap)
 import Data.Map as Map
 import Data.Map (Map)
 import Data.String.Regex (regex, test)
 
-import Expr (Expr)
-import Untyped (nf)
-import Parse (parseExpr, parseAssign)
+import Expr as UntypedExpr
+import Parse as ParseUntyped
+import Untyped as Untyped
+
+import ParseSimple as ParseSimple
+import Simple as Simple
 
 main :: Effect Unit
 main = log "app loaded"
 
 -- Like run, but doesn't distinguish between successful results and errors
 run_ :: String -> String
-run_ input = case run input of
+run_ input = case runSimple input of
                Left err -> err
                Right expr -> expr
 
--- Take a lambda calculus program as input, parse it, evaluate it, and return the result
-run :: String -> Either String String
-run input =
-  case reverse $ filter (\s -> not (null s) && not (isComment s)) (fromFoldable (lines input)) of
+runUntyped :: String -> Either String String
+runUntyped input =
+  case reverse (dropComments input) of
        Cons e as -> do
-          assigns <- lmap show $ traverse parseAssign as
-          expr <- lmap show $ parseExpr e
-          pure (show (nf (mkContext assigns) expr))
+          assigns <- lmap show $ traverse ParseUntyped.parseAssign as
+          expr <- lmap show $ ParseUntyped.parseExpr e
+          pure (show (Untyped.nf (mkContext assigns) expr))
        Nil -> pure "Empty input"
 
-mkContext :: List (Tuple String Expr) -> Map String Expr
+runSimple :: String -> Either String String
+runSimple input =
+  case reverse (dropComments input) of
+       Cons e as -> do
+          assigns <- lmap show $ traverse ParseSimple.parseAssign as
+          let ctx = mkContext assigns
+              typedAssigns = map (rmap (Simple.infer ctx)) assigns
+              ctx' = mkContext typedAssigns
+          typedAssigns <- traverse (typecheckAssign ctx') typedAssigns
+          expr <- rmap (Simple.infer ctx') $ lmap show $ ParseSimple.parseExpr e
+
+          let untypedCtx = map Simple.stripTypes ctx'
+              untypedExpr = Simple.stripTypes expr
+          case Simple.typecheck expr of
+            Right unit -> pure $ show $ Untyped.nf untypedCtx untypedExpr
+            Left expr -> Left $ "Could not determine type of " <> show expr
+       Nil -> pure "Empty input"
+
+dropComments :: String -> List String
+dropComments input = filter (\s -> not (null s) && not (isComment s)) (fromFoldable (lines input))
+
+typecheckAssign :: Map String Simple.Expr -> Tuple String Simple.Expr -> Either String (Tuple String Simple.Expr)
+typecheckAssign ctx (Tuple name expr) =
+  case Simple.typecheck (Simple.infer ctx expr) of
+    Right unit -> pure (Tuple name expr)
+    Left e -> Left $ "Could not determine type of " <> show e
+
+parseAndTypecheckAssign :: String -> Either String (Tuple String Simple.Expr)
+parseAndTypecheckAssign s = do
+  Tuple name parsed <- lmap show $ ParseSimple.parseAssign s
+  let typed = Simple.infer mempty parsed
+  case Simple.typecheck typed of
+    Right unit -> pure $ Tuple name typed
+    Left e -> Left $ "Could not determine type of " <> show e
+
+mkContext :: forall a. List (Tuple String a) -> Map String a
 mkContext cs = Map.fromFoldable cs
 
 isComment :: String -> Boolean

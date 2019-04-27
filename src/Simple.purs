@@ -7,9 +7,9 @@ import Data.Either (Either(..))
 
 import Expr as E
 
-data Ann = Arr Ann Ann
-           | T String
-           | U -- unknown
+data Ann = Arr Ann Ann -- a -> b
+           | T String  -- a
+           | U         -- unknown
 
 derive instance eqAnn :: Eq Ann
 
@@ -126,3 +126,9 @@ annotate a (Var U v) = Var a v
 annotate a (Fn U v vt b) = Fn a v vt b
 annotate a (App U x y) = App a x y
 annotate _ e = e
+
+-- Convert a STLC AST into an untyped AST
+stripTypes :: Expr -> E.Expr
+stripTypes (Var _ v) = E.Var v
+stripTypes (Fn _ v _ e) = E.Fn v (stripTypes e)
+stripTypes (App _ a b) = E.App (stripTypes a) (stripTypes b)
