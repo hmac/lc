@@ -1,8 +1,9 @@
 module Simple where
 
-import Prelude ((==), class Eq, class Show, (<>), show)
+import Prelude ((==), class Eq, class Show, (<>), show, Unit, unit, (&&), discard, pure)
 import Data.Map (Map, lookup, insert)
 import Data.Maybe (Maybe(..))
+import Data.Either (Either(..))
 
 import Expr as E
 
@@ -37,20 +38,7 @@ convert (E.App a b) = App U (convert a) (convert b)
 
 type Context = Map String Expr
 
--- TODO: make this more efficient by changing infer' :: Context -> Expr -> Expr
 infer :: Context -> Expr -> Expr
-infer ctx e@(Var U v) = Var (infer' ctx e) v
-infer ctx e@(Fn U v tv body) =
-  let ctx' = insert v (annotate tv body) ctx
-      body' = infer ctx' body
-   in Fn (infer' ctx (Fn U v tv body')) v tv body'
-infer ctx e@(App U a b) =
-  let a' = infer ctx a
-      b' = infer ctx b
-   in App (infer' ctx (App U a' b')) a' b'
-infer ctx e = e
-
-infer' :: Context -> Expr -> Ann
 -- Typing rules:
 
 -- ctx |- t : Type  ctx |- e : t
@@ -65,33 +53,68 @@ infer' :: Context -> Expr -> Ann
 ------------------------------------  (APP)
 -- ctx |- ee' : t'
 
-infer' ctx (App U a b) =
-  case getType a of
-       Arr t t' ->
-         case getType b of
-              U -> U
-              t_ -> if t == t_ then t' else U
-       _ -> U
+infer ctx (App U a b) =
+  let a' = infer ctx a
+      b' = infer ctx b
+      type_ = case getType a' of
+            Arr t t' ->
+              case getType b' of
+                U -> U
+                t_ -> if t == t_ then t' else U
+            _ -> U
+   in App type_ a' b'
 
 -- ctx, x : t |- e : t'
 -----------------------------  (LAM)
 -- ctx |- (λx -> e) : t -> t'
 
--- infer' ctx (Fn U x U e) = U
-infer' ctx (Fn U x t e) =
-  case getType e of
-       U -> U
-       t' -> Arr t t'
+-- infer ctx (Fn U x U e) = U
+infer ctx (Fn U x t e) =
+  let ctx' = insert x (annotate t e) ctx
+      e' = infer ctx' e
+      type_ = case getType e' of
+                U -> U
+                t' -> Arr t t'
+   in Fn type_ x t e'
 
 -- ctx[x] = t
 ---------------  (VAR)
 -- ctx |- x : t
-infer' ctx (Var U v) =
-  case lookup v ctx of
-       Just e -> getType e
-       Nothing -> U
+infer ctx (Var U v) =
+  let type_ = case lookup v ctx of
+                Just e -> getType e
+                Nothing -> U
+   in Var type_ v
 
-infer' ctx x = U
+infer ctx x = x
+
+-- Returns Unit if the expression typechecks.
+-- If it doesn't, it returns the subexpression which is not yet typed
+typecheck :: Expr -> Either Expr Unit
+typecheck e@(Var U _) = Left e
+typecheck e@(Fn U _ _ _) = Left e
+typecheck e@(App U _ _) = Left e
+typecheck e@(Var t _) = Right unit
+typecheck e@(Fn t _ tv body) = do
+  typecheck body
+  if unify t (Arr tv (getType body))
+    then pure unit
+    else Left e
+typecheck e@(App t f x) = do
+  typecheck f
+  typecheck x
+  case getType f of
+    Arr a b -> if unify a (getType x) && unify b t
+                 then pure unit
+                 else Left e
+    _ -> Left f
+
+-- Check if two types are the same
+unify :: Ann -> Ann -> Boolean
+unify U U = true
+unify (T a) (T b) = a == b
+unify (Arr a b) (Arr c d) = unify a c && unify b d
+unify x y = false
 
 getType :: Expr -> Ann
 getType (Fn t _ _ _) = t
