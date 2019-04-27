@@ -1,21 +1,21 @@
 module Parse (parseExpr, parseAssign) where
 
-import Prelude
+import Prelude (bind, otherwise, pure, ($), (-), (/=), (<), (<$>), (<<<))
 
 import Text.Parsing.Parser (Parser, ParseError, runParser, fail)
-import Text.Parsing.Parser.Combinators (between, try, sepBy1)
-import Text.Parsing.Parser.String (eof, string, char, satisfy, anyChar, noneOf, oneOf)
+import Text.Parsing.Parser.Combinators (between, sepBy1)
+import Text.Parsing.Parser.String (string, satisfy, oneOf)
 
 import Control.Lazy (fix)
 import Data.Either
 import Data.Array (some)
 import Control.Alt ((<|>))
 import Data.String.CodeUnits (fromCharArray)
-import Data.List
+import Data.List (List(..), foldl)
 import Global (readInt)
 import Data.Int (fromNumber)
-import Data.Maybe
-import Data.Tuple
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 
 import Expr (Expr(..))
@@ -85,9 +85,12 @@ app p = do
     Nil -> fail $ "Expected at least one application"
 
 parens :: Parser String Expr -> Parser String Expr
-parens p = string "(" *> p <* string ")"
+parens p = between (string "(") (string ")") p
 
+digits :: Array Char
 digits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+
+alphas :: Array Char
 alphas = [
   'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'

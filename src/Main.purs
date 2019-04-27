@@ -14,7 +14,8 @@ import Data.Map as Map
 import Data.Map (Map)
 import Data.String.Regex (regex, test)
 
-import Expr (Expr, nf)
+import Expr (Expr)
+import Untyped (nf)
 import Parse (parseExpr, parseAssign)
 
 main :: Effect Unit
