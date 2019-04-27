@@ -6,23 +6,16 @@ import Data.Maybe (Maybe(..))
 
 import Expr as E
 
-data TType = Arr TType TType
+data Ann = Arr Ann Ann
            | T String
-
-instance showTType :: Show TType where
-  show (T t) = t
-  show (Arr (T t1) t2) = t1 <> " -> " <> show t2
-  show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
-
-derive instance eqTType :: Eq TType
-
-data Ann = A TType
-         | U       -- type unknown
+           | U -- unknown
 
 derive instance eqAnn :: Eq Ann
 
 instance showAnn :: Show Ann where
-  show (A  t) = show t
+  show (T t) = t
+  show (Arr (T t1) t2) = t1 <> " -> " <> show t2
+  show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
   show U = "U"
 
 data Expr = Fn Ann String Ann Expr -- Fn (fn type) (var name) (var type) (body)
@@ -74,20 +67,21 @@ infer' :: Context -> Expr -> Ann
 
 infer' ctx (App U a b) =
   case getType a of
-       A (Arr t t') ->
+       Arr t t' ->
          case getType b of
-              A t_ -> if t == t_ then (A t') else U
-              _ -> U
+              U -> U
+              t_ -> if t == t_ then t' else U
        _ -> U
 
 -- ctx, x : t |- e : t'
 -----------------------------  (LAM)
 -- ctx |- (λx -> e) : t -> t'
 
-infer' ctx (Fn U x (A t) e) =
+-- infer' ctx (Fn U x U e) = U
+infer' ctx (Fn U x t e) =
   case getType e of
-       A t' -> A (Arr t t')
-       _ -> U
+       U -> U
+       t' -> Arr t t'
 
 -- ctx[x] = t
 ---------------  (VAR)
