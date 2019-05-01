@@ -1,12 +1,12 @@
 module Main where
 
-import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&), (<<<), (<>), map)
+import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&), (<>), map)
 import Effect (Effect)
 import Effect.Console (log)
 import Data.Either
 import Data.String.Utils (lines)
 import Data.List (List(..), filter, fromFoldable, reverse)
-import Data.Traversable (traverse)
+import Data.Traversable (traverse, mapAccumL, foldl, foldr)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
 import Data.Bifunctor (lmap, rmap)
@@ -14,7 +14,6 @@ import Data.Map as Map
 import Data.Map (Map)
 import Data.String.Regex (regex, test)
 
-import Expr as UntypedExpr
 import Parse as ParseUntyped
 import Untyped as Untyped
 
@@ -44,13 +43,10 @@ runSimple input =
   case reverse (dropComments input) of
        Cons e as -> do
           assigns <- lmap show $ traverse ParseSimple.parseAssign as
-          let ctx = mkContext assigns
-              typedAssigns = map (rmap (Simple.infer ctx)) assigns
-              ctx' = mkContext typedAssigns
-          typedAssigns <- traverse (typecheckAssign ctx') typedAssigns
-          expr <- rmap (Simple.infer ctx') $ lmap show $ ParseSimple.parseExpr e
+          let ctx = foldr (\(Tuple name expr) ctx -> Map.insert name (Simple.infer ctx expr) ctx) mempty assigns
+          expr <- rmap (Simple.infer ctx) $ lmap show $ ParseSimple.parseExpr e
 
-          let untypedCtx = map Simple.stripTypes ctx'
+          let untypedCtx = map Simple.stripTypes ctx
               untypedExpr = Simple.stripTypes expr
           case Simple.typecheck expr of
             Right unit -> pure $ show $ Untyped.nf untypedCtx untypedExpr

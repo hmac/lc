@@ -11,38 +11,9 @@
   <body>
     <h3>Input</h3>
     <textarea id="input" cols=80 rows=32>
-id = \x. x
+-- Write your program here
 
--- Booleans
-true = \x. \y. x
-false = \x. \y. y
-
--- Pairs
-MkPair = \a. \b. \x. x a b
-fst = \p. p true
-snd = \p. p false
-
--- Natural numbers
-zero = \f. \x. x
-succ = \n. \f. \x. f (n f x)
-
--- (for convenience, you can use integer literals)
-three = 3
-
--- predecessor of a natural number (pred 4 == 3)
-pred = \n. fst (predHelper n)
-predHelper = \n. n (\p. \x. x (snd p) (succ (snd p))) (MkPair 0 0)
-
-isZero = \n. n (\t. false) true
-
-plus = \n. \m. \f. \x. n f (m f x)
-minus = \n. \m. m pred n
-mult = \n. \m. n (plus m) 0
-exp = \n. \m. m (mult n) 1
-
-
--- the last line is expected to be an expression
-plus 1 1</textarea>
+1</textarea>
     <h3>Output</h3>
     <textarea id="output" cols=80 rows=5></textarea>
     <script>
@@ -51,12 +22,49 @@ plus 1 1</textarea>
       let input_box = document.querySelector("#input");
       let output_box = document.querySelector("#output");
       let evaluate = function() {
-        let input = input_box.value;
-        let output = run(input);
-        output_box.value = output;
+        output_box.value = run(input_box.value);
       };
       input_box.addEventListener("input", evaluate);
       evaluate();
     </script>
+
+    <p>Untyped Lambda Calculus Prelude</p>
+    <pre>
+    id = \x. x
+
+    -- Booleans
+    true = \x. \y. x
+    false = \x. \y. y
+
+    -- Pairs
+    MkPair = \a. \b. \x. x a b
+    fst = \p. p true
+    snd = \p. p false
+
+    -- Natural numbers
+    zero = \f. \x. x
+    succ = \n. \f. \x. f (n f x)
+
+    -- (for convenience, you can use integer literals)
+    three = 3
+
+    -- predecessor of a natural number (pred 4 == 3)
+    pred = \n. fst (predHelper n)
+    predHelper = \n. n (\p. \x. x (snd p) (succ (snd p))) (MkPair 0 0)
+
+    isZero = \n. n (\t. false) true
+
+    plus = \n. \m. \f. \x. n f (m f x)
+    minus = \n. \m. m pred n
+    mult = \n. \m. n (plus m) 0
+    exp = \n. \m. m (mult n) 1
+    </pre>
+    <p>Simply Typed Lambda Calculus Prelude</p>
+    <pre>
+    -- Natural numbers
+    succ = \n : (N -> N) -> N -> N. \f : N -> N. \x : N. f (n f x)
+    plus = \n : (N -> N) -> N -> N. \m : (N -> N) -> N -> N. \f : N -> N. \x : N. n f (m f x)
+    mult = \n : (N -> N) -> N -> N. \m : (N -> N) -> N -> N. \f : N -> N. \x : N. n (m f) x
+    </pre>
   </body>
 </html>
