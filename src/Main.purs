@@ -64,7 +64,7 @@ typecheckAssign :: Map String Simple.Expr -> Tuple String Simple.Expr -> Either 
 typecheckAssign ctx (Tuple name expr) =
   case Simple.typecheck (Simple.infer ctx expr) of
     Right unit -> pure (Tuple name expr)
-    Left e -> Left $ "Could not determine type of " <> show e
+    Left e -> Left $ "Could not determine type of " <> name <> ": " <> show e
 
 parseAndTypecheckAssign :: String -> Either String (Tuple String Simple.Expr)
 parseAndTypecheckAssign s = do
@@ -72,7 +72,7 @@ parseAndTypecheckAssign s = do
   let typed = Simple.infer mempty parsed
   case Simple.typecheck typed of
     Right unit -> pure $ Tuple name typed
-    Left e -> Left $ "Could not determine type of " <> show e
+    Left e -> Left $ "Could not determine type of " <> name <> ": " <> show e
 
 mkContext :: forall a. List (Tuple String a) -> Map String a
 mkContext cs = Map.fromFoldable cs

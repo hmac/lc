@@ -45,12 +45,6 @@ showExpr ShowUTypes (Fn a v va e) =
 showExpr ShowUTypes (App a x y) =
   "((" <> show x <> ") (" <> show y <> "))" <> " : " <> show a
 
--- TODO: we'll need to be able to parse and represent type annotations
-convert :: E.Expr -> Expr
-convert (E.Fn v e) = Fn U v U (convert e)
-convert (E.Var v) = Var U v
-convert (E.App a b) = App U (convert a) (convert b)
-
 type Context = Map String Expr
 
 infer :: Context -> Expr -> Expr
