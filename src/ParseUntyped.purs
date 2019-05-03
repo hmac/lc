@@ -1,4 +1,4 @@
-module Parse (parseExpr, parseAssign) where
+module ParseUntyped (parseExpr, parseAssign) where
 
 import Prelude (bind, otherwise, pure, ($), (-), (/=), (<), (<$>), (<<<))
 

@@ -14,7 +14,7 @@ import Data.Map as Map
 import Data.Map (Map)
 import Data.String.Regex (regex, test)
 
-import Parse as ParseUntyped
+import ParseUntyped as ParseUntyped
 import Untyped as Untyped
 
 import ParseSimple as ParseSimple
