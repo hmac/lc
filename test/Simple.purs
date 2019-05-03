@@ -5,6 +5,7 @@ import Effect (Effect)
 import Test.Assert (assertEqual)
 
 import Simple
+import Expr
 
 main :: Effect Unit
 main = do

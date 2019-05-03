@@ -1,5 +1,11 @@
 module ParseUntyped (parseExpr, parseAssign) where
 
+-- This is the first parser I wrote for this project.
+-- It's a bit simpler than the one in Parse because it doesn't have to worry about type
+-- annotations.
+-- Instead of trying to merge the two together, and deal with optional annotations, I've
+-- just left it alone.
+
 import Prelude (bind, otherwise, pure, ($), (-), (/=), (<), (<$>), (<<<))
 
 import Text.Parsing.Parser (Parser, ParseError, runParser, fail)
