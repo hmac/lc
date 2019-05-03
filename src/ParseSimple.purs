@@ -18,12 +18,10 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 
-import Simple (Expr(..), Ann(..))
+import Simple (Expr, Type(..))
+import Expr
 
 type P = Parser String
-
-parseAnn :: String -> Either ParseError Ann
-parseAnn input = runParser input annotation
 
 parseExpr :: String -> Either ParseError Expr
 parseExpr input = runParser input expr
@@ -76,19 +74,19 @@ func p = do
   pure $ Fn U v t e
 
 -- Parsing type annotations
-annotation :: Parser String Ann
+annotation :: Parser String Type
 annotation = fix $ \p -> annExpr p
-annExpr :: Parser String Ann -> Parser String Ann
+annExpr :: Parser String Type -> Parser String Type
 annExpr p = annArrow p <|> annExpr' p
-annArrow :: Parser String Ann -> Parser String Ann
+annArrow :: Parser String Type -> Parser String Type
 annArrow p = do
   apps <- sepBy1 (annExpr' p) (string " -> ")
   case reverse apps of
     Nil -> fail $ "Expected at least one type application"
     Cons last rest -> pure $ foldr Arr last (reverse rest)
-annExpr' :: Parser String Ann -> Parser String Ann
+annExpr' :: Parser String Type -> Parser String Type
 annExpr' p = parens annotation <|> annType
-annType :: Parser String Ann
+annType :: Parser String Type
 annType = T <$> ident
 
 var :: Parser String Expr

@@ -1,4 +1,4 @@
-module Untyped (nf, Expr(..)) where
+module Untyped (nf, Expr, var, fn, app) where
 
 import Prelude
 
@@ -8,16 +8,19 @@ import Data.NonEmpty as NonEmpty
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..), fromMaybe)
 
-data Expr = Fn String Expr
-          | Var String
-          | App Expr Expr
+import Expr
 
-derive instance eqExpr :: Eq Expr
+type Expr = ExprT Unit
 
-instance showExpr :: Show Expr where
-  show (Var v) = v
-  show (Fn v e) = "(λ" <> v <> ". " <> show e <> ")"
-  show (App a b) = "(" <> show a <> " " <> show b <> ")"
+-- Convenience functions for constructing terms
+var :: String -> Expr
+var = Var unit
+
+fn :: String -> Expr -> Expr
+fn v e = Fn unit v unit e
+
+app :: Expr -> Expr -> Expr
+app = App unit
 
 type Context = Map String Expr
 
@@ -39,20 +42,20 @@ reduceList ctx expr = go (NonEmpty.singleton expr)
 
 -- Apply beta reduction once
 reduce :: Context -> Expr -> Expr
-reduce ctx (Var v) = fromMaybe (Var v) (lookup v ctx)
-reduce ctx (Fn v a) = Fn v (reduce ctx a)
-reduce ctx (App (Fn v a) b) = substitute v a b
-reduce ctx (App (Var v) b) = case lookup v ctx of
-                               Just e -> App e b
-                               Nothing -> (App (Var v) (reduce ctx b))
-reduce ctx (App a b) = App (reduce ctx a) (reduce ctx b) -- do we need to reduce the argument?
+reduce ctx (Var _ v) = fromMaybe (var v) (lookup v ctx)
+reduce ctx (Fn _ v _ a) = fn v (reduce ctx a)
+reduce ctx (App _ (Fn _ v _ a) b) = substitute v a b
+reduce ctx (App _ (Var _ v) b) = case lookup v ctx of
+                               Just e -> app e b
+                               Nothing -> (app (var v) (reduce ctx b))
+reduce ctx (App _ a b) = app (reduce ctx a) (reduce ctx b) -- do we need to reduce the argument?
 
 -- Substitute an argument for a function parameter
 -- (λx. e) a ⤳ e[a/x]
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = go a
-  where go (Var v') | v' == v = b
-                    | otherwise = Var v'
-        go (Fn v' e) | v' == v = Fn v' e
-                     | otherwise = Fn v' (go e)
-        go (App x y) = App (go x) (go y)
+  where go (Var _ v') | v' == v = b
+                    | otherwise = var v'
+        go (Fn _ v' _ e) | v' == v = fn v' e
+                     | otherwise = fn v' (go e)
+        go (App _ x y) = app (go x) (go y)

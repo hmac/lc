@@ -18,7 +18,8 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 
-import Untyped (Expr(..))
+import Expr
+import Untyped (Expr, var, app, fn)
 
 type P = Parser String
 
@@ -40,10 +41,10 @@ expr = fix $ \p -> expr' p
 -- expr = fix $ \p -> (func <|> try (app p) <|> aexpr p)
 
 expr' :: Parser String Expr -> Parser String Expr
-expr' p = app p <|> aexpr p
+expr' p = application p <|> aexpr p
 
 aexpr :: Parser String Expr -> Parser String Expr
-aexpr p = parens expr <|> number <|> func p <|> var
+aexpr p = parens expr <|> number <|> func p <|> variable
 
 number :: Parser String Expr
 number = do
@@ -58,9 +59,9 @@ mkChurchNumeral n | n < 0 = zero -- just to avoid throwing an error
                   | otherwise = (unsafePartial succ) (mkChurchNumeral (n - 1))
 
 zero :: Expr
-zero = Fn "f" (Fn "x" (Var "x"))
+zero = fn "f" (fn "x" (var "x"))
 succ :: Partial => Expr -> Expr
-succ (Fn _ (Fn _ n)) = Fn "f" (Fn "x" (App (Var "f") n))
+succ (Fn _ _ _ (Fn _ _ _ n)) = fn "f" (fn "x" (app (var "f") n))
 
 func :: Parser String Expr -> Parser String Expr
 func p = do
@@ -68,20 +69,20 @@ func p = do
   v <- some (satisfy (_ /= '.'))
   _ <- string ". "
   e <- expr' p
-  pure $ Fn (fromCharArray v) e
+  pure $ fn (fromCharArray v) e
 
-var :: Parser String Expr
-var = Var <$> ident
+variable :: Parser String Expr
+variable = var <$> ident
 
 ident :: Parser String String
 ident = fromCharArray <$> some (oneOf alphas)
 
-app :: Parser String Expr -> Parser String Expr
-app p = do
+application :: Parser String Expr -> Parser String Expr
+application p = do
   _ <- pure 1
   apps <- sepBy1 (aexpr p) (string " ")
   case apps of
-    Cons e es -> pure $ foldl App e es
+    Cons e es -> pure $ foldl app e es
     Nil -> fail $ "Expected at least one application"
 
 parens :: Parser String Expr -> Parser String Expr

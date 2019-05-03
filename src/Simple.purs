@@ -6,44 +6,21 @@ import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 
 import Untyped as U
+import Expr
 
-data Ann = Arr Ann Ann -- a -> b
+data Type = Arr Type Type -- a -> b
            | T String  -- a
            | U         -- unknown
 
-derive instance eqAnn :: Eq Ann
+derive instance eqType :: Eq Type
 
-instance showAnn :: Show Ann where
+instance showType :: Show Type where
   show (T t) = t
   show (Arr (T t1) t2) = t1 <> " -> " <> show t2
   show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
   show U = "?"
 
-
-data Expr = Fn Ann String Ann Expr -- Fn (fn type) (var name) (var type) (body)
-          | Var Ann String
-          | App Ann Expr Expr
-
-derive instance eqExpr :: Eq Expr
-
-instance showExpr_ :: Show Expr where
-  show = showExpr ShowUTypes
-
-data ShowOption = ShowUTypes | HideUTypes
-showExpr :: ShowOption -> Expr -> String
-showExpr HideUTypes (Var U v) = v
-showExpr HideUTypes (Fn U v va e) =
-  "(λ" <> (showExpr HideUTypes (Var va v)) <> ". " <> showExpr HideUTypes e <> ")"
-showExpr HideUTypes (App U x y) =
-  "((" <> showExpr HideUTypes x <> ") (" <> showExpr HideUTypes y <> "))"
-
-showExpr HideUTypes x = showExpr ShowUTypes x
-
-showExpr ShowUTypes (Var a v) = v <> " : " <> show a
-showExpr ShowUTypes (Fn a v va e) =
-  "(λ" <> v <> " : " <> show va <> ". " <> show e <> ")" <> " : " <> show a
-showExpr ShowUTypes (App a x y) =
-  "((" <> show x <> ") (" <> show y <> "))" <> " : " <> show a
+type Expr = ExprT Type
 
 type Context = Map String Expr
 
@@ -119,18 +96,18 @@ typecheck e@(App t f x) = do
     _ -> Left f
 
 -- Check if two types are the same
-unify :: Ann -> Ann -> Boolean
+unify :: Type -> Type -> Boolean
 unify U U = true
 unify (T a) (T b) = a == b
 unify (Arr a b) (Arr c d) = unify a c && unify b d
 unify x y = false
 
-getType :: Expr -> Ann
+getType :: Expr -> Type
 getType (Fn t _ _ _) = t
 getType (Var t _) = t
 getType (App t _ _) = t
 
-annotate :: Ann -> Expr -> Expr
+annotate :: Type -> Expr -> Expr
 annotate a (Var U v) = Var a v
 annotate a (Fn U v vt b) = Fn a v vt b
 annotate a (App U x y) = App a x y
@@ -138,9 +115,9 @@ annotate _ e = e
 
 -- Convert a STLC AST into an untyped AST
 stripTypes :: Expr -> U.Expr
-stripTypes (Var _ v) = U.Var v
-stripTypes (Fn _ v _ e) = U.Fn v (stripTypes e)
-stripTypes (App _ a b) = U.App (stripTypes a) (stripTypes b)
+stripTypes (Var _ v) = U.var v
+stripTypes (Fn _ v _ e) = U.fn v (stripTypes e)
+stripTypes (App _ a b) = U.app (stripTypes a) (stripTypes b)
 
 -- Return the normal form of the given expression, if there is one.
 -- If it doesn't have a normal form, this function will hang forever.

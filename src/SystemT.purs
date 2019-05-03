@@ -4,7 +4,7 @@ import Prelude
 import Data.Map (Map, lookup, insert, singleton)
 import Data.Maybe (Maybe(..), fromMaybe)
 
-import Simple as S
+import Expr
 
 -- System T is like STLC but with a builtin Nat type
 
@@ -22,39 +22,7 @@ instance showAnn :: Show Ann where
   show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
   show U = "?"
 
-data Expr = Fn Ann String Ann Expr -- Fn (fn type) (var name) (var type) (body)
-          | Var Ann String
-          | App Ann Expr Expr
-
--- Eq and Show instances for Expr
--- TODO: combine these with the identical ones in Simple
-derive instance eqExpr :: Eq Expr
-instance showExpr_ :: Show Expr where
-  show = showExpr ShowUTypes
-data ShowOption = ShowUTypes | HideUTypes | HideAllTypes | Raw
-showExpr :: ShowOption -> Expr -> String
-showExpr Raw (Var t v) = "(Var " <> show t <> " " <> v <> " )"
-showExpr Raw (App t a b) = "(App " <> show t <> " " <> showExpr Raw a <> " " <> showExpr Raw b <> " )"
-showExpr Raw (Fn t v tv e) = "(Fn " <> show t <> " " <> v <> " " <> show tv <> " " <> showExpr Raw e <> " )"
-showExpr HideAllTypes (Var _ v) = v
-showExpr HideAllTypes (Fn _ v _ e) =
-  "(λ" <> v <> ". " <> showExpr HideAllTypes e <> ")"
-showExpr HideAllTypes (App _ a b) =
-  "((" <> showExpr HideAllTypes a <> ") (" <> showExpr HideAllTypes b <> "))"
-
-showExpr HideUTypes (Var U v) = v
-showExpr HideUTypes (Fn U v va e) =
-  "(λ" <> (showExpr HideUTypes (Var va v)) <> ". " <> showExpr HideUTypes e <> ")"
-showExpr HideUTypes (App U x y) =
-  "((" <> showExpr HideUTypes x <> ") (" <> showExpr HideUTypes y <> "))"
-
-showExpr HideUTypes x = showExpr ShowUTypes x
-
-showExpr ShowUTypes (Var a v) = v <> " : " <> show a
-showExpr ShowUTypes (Fn a v va e) =
-  "(λ" <> v <> " : " <> show va <> ". " <> show e <> ")" <> " : " <> show a
-showExpr ShowUTypes (App a x y) =
-  "((" <> show x <> ") (" <> show y <> "))" <> " : " <> show a
+type Expr = ExprT Ann
 
 type Context = Map String Expr
 
