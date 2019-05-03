@@ -24,7 +24,7 @@ showExpr HideTypes (Var _ v) = v
 showExpr HideTypes (Fn _ v _ e) =
   "(λ" <> v <> ". " <> showExpr HideTypes e <> ")"
 showExpr HideTypes (App _ a b) =
-  "((" <> showExpr HideTypes a <> ") (" <> showExpr HideTypes b <> "))"
+  "(" <> showExpr HideTypes a <> " " <> showExpr HideTypes b <> ")"
 
 showExpr ShowTypes (Var a v) = v <> " : " <> show a
 showExpr ShowTypes (Fn a v va e) =

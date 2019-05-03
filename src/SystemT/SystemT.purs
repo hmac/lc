@@ -3,6 +3,10 @@ module SystemT where
 import Prelude
 import Data.Map (Map, lookup, insert, singleton)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Either (Either(..))
+import Data.NonEmpty as NonEmpty
+import Data.List (List(..))
+import Data.NonEmpty (NonEmpty(..), (:|))
 
 import Expr
 
@@ -131,6 +135,23 @@ annotate a (Fn U v vt b) = Fn a v vt b
 annotate a (App U x y) = App a x y
 annotate _ e = e
 
+-- Return the normal form of the given expression, if there is one.
+-- If it doesn't have a normal form, this function will hang forever.
+-- We do this by stripping away types and deferring to the untyped LC
+nf :: Context -> Expr -> Expr
+nf ctx e = NonEmpty.head (reduceList ctx e)
+
+-- Apply beta reduction repeatedly until we reach normal form
+-- This will loop indefinitely if the expression has no normal form
+-- TODO: add a maximum reduction limit to catch this
+reduceList :: Context -> Expr -> NonEmpty List Expr
+reduceList ctx expr = go (NonEmpty.singleton expr)
+  where go :: NonEmpty List Expr -> NonEmpty List Expr
+        go (NonEmpty e es) = let e' = reduce ctx e
+                             in if e' == e
+                                then e :| es
+                                else go (e' :| (Cons e es))
+
 -- System T has two special reduction rules:
 --
 -- rec h a 0 ⤳ a
@@ -162,3 +183,31 @@ substitute v a b = go a
         go (Fn t v' tv' e) | v' == v = Fn t v' tv' e
                      | otherwise = Fn t v' tv' (go e)
         go (App t x y) = App t (go x) (go y)
+
+-- Returns Unit if the expression typechecks.
+-- If it doesn't, it returns the subexpression which is not yet typed
+typecheck :: Expr -> Either Expr Unit
+typecheck e@(Var U _) = Left e
+typecheck e@(Fn U _ _ _) = Left e
+typecheck e@(App U _ _) = Left e
+typecheck e@(Var t _) = Right unit
+typecheck e@(Fn t _ tv body) = do
+  typecheck body
+  if unify t (Arr tv (getType body))
+    then pure unit
+    else Left e
+typecheck e@(App t f x) = do
+  typecheck f
+  typecheck x
+  case getType f of
+    Arr a b -> if unify a (getType x) && unify b t
+                 then pure unit
+                 else Left e
+    _ -> Left f
+
+-- Check if two types are the same
+unify :: Ann -> Ann -> Boolean
+unify U U = true
+unify Nat Nat = true
+unify (Arr a b) (Arr c d) = unify a c && unify b d
+unify x y = false

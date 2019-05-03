@@ -1,6 +1,6 @@
 module Main where
 
-import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&), (<>))
+import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&), (<>), identity)
 import Effect (Effect)
 import Effect.Console (log)
 import Data.Either
@@ -20,25 +20,25 @@ import Untyped as Untyped
 import Simple.Parse as ParseSimple
 import Simple as Simple
 
+import SystemT.Parse as SystemT.Parse
+import SystemT as SystemT
+
+import Expr
+
 main :: Effect Unit
 main = log "app loaded"
 
-run :: String -> String
-run input = case runSimple input of
-               Left err -> err
-               Right expr -> expr
-
-runUntyped :: String -> Either String String
-runUntyped input =
+runUntyped :: String -> String
+runUntyped input = either identity identity $
   case reverse (dropComments input) of
        Cons e as -> do
           assigns <- lmap show $ traverse ParseUntyped.parseAssign as
           expr <- lmap show $ ParseUntyped.parseExpr e
-          pure (show (Untyped.nf (mkContext assigns) expr))
+          pure (showExpr HideTypes (Untyped.nf (mkContext assigns) expr))
        Nil -> pure "Empty input"
 
-runSimple :: String -> Either String String
-runSimple input =
+runSimple :: String -> String
+runSimple input = either identity identity $
   case reverse (dropComments input) of
        Cons e as -> do
           assigns <- lmap show $ traverse ParseSimple.parseAssign as
@@ -46,7 +46,20 @@ runSimple input =
           expr <- rmap (Simple.infer ctx) $ lmap show $ ParseSimple.parseExpr e
 
           case Simple.typecheck expr of
-            Right unit -> pure $ show $ Simple.nf ctx expr
+            Right unit -> pure $ showExpr HideTypes $ Simple.nf ctx expr
+            Left expr -> Left $ "Could not determine type of " <> show expr
+       Nil -> pure "Empty input"
+
+runSystemT :: String -> String
+runSystemT input = either identity identity $
+  case reverse (dropComments input) of
+       Cons e as -> do
+          assigns <- lmap show $ traverse SystemT.Parse.parseAssign as
+          let ctx = foldr (\(Tuple name expr) ctx -> Map.insert name (SystemT.infer ctx expr) ctx) mempty assigns
+          expr <- rmap (SystemT.infer ctx) $ lmap show $ SystemT.Parse.parseExpr e
+
+          case SystemT.typecheck expr of
+            Right unit -> pure $ show $ SystemT.nf ctx expr
             Left expr -> Left $ "Could not determine type of " <> show expr
        Nil -> pure "Empty input"
 

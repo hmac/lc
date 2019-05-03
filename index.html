@@ -10,6 +10,13 @@
   </head>
   <body>
     <h3>Input</h3>
+    <label>Type System:</label>
+    <select id="picker">
+      <option value="untyped">Untyped Lambda Calculus</option>
+      <option value="stlc">Simply Typed Lambda Calculus</option>
+      <option value="systemt">System T</option>
+    </select>
+    <p></p>
     <textarea id="input" cols=80 rows=32>
 -- Write your program here
 
@@ -17,14 +24,29 @@
     <h3>Output</h3>
     <textarea id="output" cols=80 rows=5></textarea>
     <script>
+      let type_system = "untyped";
+
+      let runFuncs = {
+        "untyped": "runUntyped",
+        "stlc": "runSimple",
+        "systemt": "runSystemT"
+      };
+
       let run = PS["Main"].run;
 
       let input_box = document.querySelector("#input");
       let output_box = document.querySelector("#output");
       let evaluate = function() {
-        output_box.value = run(input_box.value);
+        output_box.value = PS["Main"][runFuncs[type_system]](input_box.value);
       };
       input_box.addEventListener("input", evaluate);
+
+      let picker = document.querySelector("#picker");
+      picker.addEventListener("change", function(event) {
+        type_system = event.target.value;
+        evaluate();
+      });
+
       evaluate();
     </script>
 
