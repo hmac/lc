@@ -18,7 +18,7 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 
-import Expr (Expr(..))
+import Untyped (Expr(..))
 
 type P = Parser String
 

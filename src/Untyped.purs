@@ -1,4 +1,4 @@
-module Untyped (nf) where
+module Untyped (nf, Expr(..)) where
 
 import Prelude
 
@@ -8,7 +8,16 @@ import Data.NonEmpty as NonEmpty
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..), fromMaybe)
 
-import Expr (Expr(..))
+data Expr = Fn String Expr
+          | Var String
+          | App Expr Expr
+
+derive instance eqExpr :: Eq Expr
+
+instance showExpr :: Show Expr where
+  show (Var v) = v
+  show (Fn v e) = "(λ" <> v <> ". " <> show e <> ")"
+  show (App a b) = "(" <> show a <> " " <> show b <> ")"
 
 type Context = Map String Expr
 
