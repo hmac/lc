@@ -1,4 +1,4 @@
-module Test.ParseSimple where
+module Test.Simple.Parse where
 
 import Prelude
 import Effect (Effect)

@@ -1,4 +1,4 @@
-module ParseSystemT where
+module SystemT.Parse where
 
 import Prelude
 import Data.Either

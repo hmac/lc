@@ -1,4 +1,4 @@
-module ParseUntyped (parseExpr, parseAssign) where
+module Untyped.Parse (parseExpr, parseAssign) where
 
 -- This is the first parser I wrote for this project.
 -- It's a bit simpler than the one in Parse because it doesn't have to worry about type

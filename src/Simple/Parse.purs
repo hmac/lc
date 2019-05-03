@@ -1,4 +1,4 @@
-module ParseSimple (parseExpr, parseAssign) where
+module Simple.Parse (parseExpr, parseAssign) where
 
 import Prelude
 

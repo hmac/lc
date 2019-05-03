@@ -14,10 +14,10 @@ import Data.Map as Map
 import Data.Map (Map)
 import Data.String.Regex (regex, test)
 
-import ParseUntyped as ParseUntyped
+import Untyped.Parse as ParseUntyped
 import Untyped as Untyped
 
-import ParseSimple as ParseSimple
+import Simple.Parse as ParseSimple
 import Simple as Simple
 
 main :: Effect Unit

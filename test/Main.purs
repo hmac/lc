@@ -3,10 +3,10 @@ module Test.Main where
 import Prelude
 import Effect (Effect)
 
-import Test.ParseSimple as TestParseSimple
-import Test.Simple as TestSimple
+import Test.Simple as Test.Simple
+import Test.Simple.Parse as Test.Simple.Parse
 
 main :: Effect Unit
 main = do
-  TestParseSimple.main
-  TestSimple.main
+  Test.Simple.main
+  Test.Simple.Parse.main
