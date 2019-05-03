@@ -23,9 +23,8 @@ import Simple as Simple
 main :: Effect Unit
 main = log "app loaded"
 
--- Like run, but doesn't distinguish between successful results and errors
-run_ :: String -> String
-run_ input = case runSimple input of
+run :: String -> String
+run input = case runSimple input of
                Left err -> err
                Right expr -> expr
 
