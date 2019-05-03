@@ -1,11 +1,12 @@
 module Simple where
 
-import Prelude ((==), class Eq, class Show, (<>), show, Unit, unit, (&&), discard, pure)
+import Prelude ((==), map, class Eq, class Show, (<>), show, Unit, unit, (&&), discard, pure)
 import Data.Map (Map, lookup, insert)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 
 import Expr as E
+import Untyped as Untyped
 
 data Ann = Arr Ann Ann -- a -> b
            | T String  -- a
@@ -141,3 +142,9 @@ stripTypes :: Expr -> E.Expr
 stripTypes (Var _ v) = E.Var v
 stripTypes (Fn _ v _ e) = E.Fn v (stripTypes e)
 stripTypes (App _ a b) = E.App (stripTypes a) (stripTypes b)
+
+-- Return the normal form of the given expression, if there is one.
+-- If it doesn't have a normal form, this function will hang forever.
+-- We do this by stripping away types and deferring to the untyped LC
+nf :: Context -> Expr -> E.Expr
+nf ctx expr = Untyped.nf (map stripTypes ctx) (stripTypes expr)

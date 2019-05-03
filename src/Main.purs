@@ -46,10 +46,8 @@ runSimple input =
           let ctx = foldr (\(Tuple name expr) ctx -> Map.insert name (Simple.infer ctx expr) ctx) mempty assigns
           expr <- rmap (Simple.infer ctx) $ lmap show $ ParseSimple.parseExpr e
 
-          let untypedCtx = map Simple.stripTypes ctx
-              untypedExpr = Simple.stripTypes expr
           case Simple.typecheck expr of
-            Right unit -> pure $ show $ Untyped.nf untypedCtx untypedExpr
+            Right unit -> pure $ show $ Simple.nf ctx expr
             Left expr -> Left $ "Could not determine type of " <> show expr
        Nil -> pure "Empty input"
 
