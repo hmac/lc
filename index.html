@@ -52,41 +52,50 @@
 
     <p>Untyped Lambda Calculus Prelude</p>
     <pre>
-    id = \x. x
+id = \x. x
 
-    -- Booleans
-    true = \x. \y. x
-    false = \x. \y. y
+-- Booleans
+true = \x. \y. x
+false = \x. \y. y
 
-    -- Pairs
-    MkPair = \a. \b. \x. x a b
-    fst = \p. p true
-    snd = \p. p false
+-- Pairs
+MkPair = \a. \b. \x. x a b
+fst = \p. p true
+snd = \p. p false
 
-    -- Natural numbers
-    zero = \f. \x. x
-    succ = \n. \f. \x. f (n f x)
+-- Natural numbers
+zero = \f. \x. x
+succ = \n. \f. \x. f (n f x)
 
-    -- (for convenience, you can use integer literals)
-    three = 3
+-- (for convenience, you can use integer literals)
+three = 3
 
-    -- predecessor of a natural number (pred 4 == 3)
-    pred = \n. fst (predHelper n)
-    predHelper = \n. n (\p. \x. x (snd p) (succ (snd p))) (MkPair 0 0)
+-- predecessor of a natural number (pred 4 == 3)
+pred = \n. fst (predHelper n)
+predHelper = \n. n (\p. \x. x (snd p) (succ (snd p))) (MkPair 0 0)
 
-    isZero = \n. n (\t. false) true
+isZero = \n. n (\t. false) true
 
-    plus = \n. \m. \f. \x. n f (m f x)
-    minus = \n. \m. m pred n
-    mult = \n. \m. n (plus m) 0
-    exp = \n. \m. m (mult n) 1
+plus = \n. \m. \f. \x. n f (m f x)
+minus = \n. \m. m pred n
+mult = \n. \m. n (plus m) 0
+exp = \n. \m. m (mult n) 1
     </pre>
     <p>Simply Typed Lambda Calculus Prelude</p>
     <pre>
-    -- Natural numbers
-    succ = \n : (N -> N) -> N -> N. \f : N -> N. \x : N. f (n f x)
-    plus = \n : (N -> N) -> N -> N. \m : (N -> N) -> N -> N. \f : N -> N. \x : N. n f (m f x)
-    mult = \n : (N -> N) -> N -> N. \m : (N -> N) -> N -> N. \f : N -> N. \x : N. n (m f) x
+-- Natural numbers
+succ = \n : (N -> N) -> N -> N. \f : N -> N. \x : N. f (n f x)
+plus = \n : (N -> N) -> N -> N. \m : (N -> N) -> N -> N. \f : N -> N. \x : N. n f (m f x)
+mult = \n : (N -> N) -> N -> N. \m : (N -> N) -> N -> N. \f : N -> N. \x : N. n (m f) x
+    </pre>
+    <p>System T Prelude</p>
+    <pre>
+-- Natural numbers:
+-- Succ and Zero are built in
+-- As is Rec, the generic recursion combinator
+
+plus = \m : Nat. \n : Nat. Rec (\x : Nat. \k : Nat. Succ k) m n
+mult = \m : Nat. \n : Nat. Rec (\x : Nat. \k : Nat. plus k m) 0 n
     </pre>
   </body>
 </html>
