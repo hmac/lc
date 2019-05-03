@@ -1,12 +1,12 @@
 module Main where
 
-import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&), (<>), map)
+import Prelude (Unit, bind, mempty, not, pure, show, ($), (&&), (<>))
 import Effect (Effect)
 import Effect.Console (log)
 import Data.Either
 import Data.String.Utils (lines)
 import Data.List (List(..), filter, fromFoldable, reverse)
-import Data.Traversable (traverse, mapAccumL, foldl, foldr)
+import Data.Traversable (traverse, foldr)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
 import Data.Bifunctor (lmap, rmap)
