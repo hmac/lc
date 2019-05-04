@@ -7,34 +7,34 @@ import Data.Either (Either(..))
 import Test.QuickCheck (class Arbitrary, arbitrary, quickCheck, (<?>))
 import Test.QuickCheck.Gen (Gen)
 import Test.QuickCheck.Gen as Gen
-import Data.NonEmpty ((:|), NonEmpty)
+import Data.NonEmpty ((:|))
 import Control.Lazy (defer)
 
 import Data.String.Gen (genAlphaString)
 
-import ParseSimple (parseExpr)
+import Simple.Parse (parseExpr)
 import Expr
-import Simple (Expr(..), Type(..))
+import Simple (Expr, Type(..))
 
 main :: Effect Unit
 main = do
   "x" ~> Var U "x"
   "y" ~> Var U "y"
-  "x : A" ~> Var (T "A") "x"
-  "x : B" ~> Var (T "B") "x"
-  "(f : (A -> B)) (x : A)" ~> App U (Var (Arr (T "A") (T "B")) "f") (Var (T "A") "x")
-  "f : A -> B x : A" ~> App U (Var (Arr (T "A") (T "B")) "f") (Var (T "A") "x")
+  "x : A" ~> Var T "x"
+  "x : B" ~> Var T "x"
+  "(f : (A -> B)) (x : A)" ~> App U (Var (Arr T T) "f") (Var T "x")
+  "f : A -> B x : A" ~> App U (Var (Arr T T) "f") (Var T "x")
 
   "f x" ~> App U (Var U "f") (Var U "x")
-  "f (x : A)" ~> App U (Var U "f") (Var (T "A") "x")
-  "f (x : B)" ~> App U (Var U "f") (Var (T "B") "x")
+  "f (x : A)" ~> App U (Var U "f") (Var T "x")
+  "f (x : B)" ~> App U (Var U "f") (Var T "x")
 
   "\\x. x" ~> Fn U "x" U (Var U "x")
   "λx. x" ~> Fn U "x" U (Var U "x")
-  "\\x : A. x" ~> Fn U "x" (T "A") (Var U "x")
-  "\\x : B. x" ~> Fn U "x" (T "B") (Var U "x")
+  "\\x : A. x" ~> Fn U "x" T (Var U "x")
+  "\\x : B. x" ~> Fn U "x" T (Var U "x")
   "\\f : A -> B. \\x : A. f x" ~>
-    Fn U "f" (Arr (T "A") (T "B")) (Fn U "x" (T "A") (App U (Var U "f") (Var U "x")))
+    Fn U "f" (Arr T T) (Fn U "x" T (App U (Var U "f") (Var U "x")))
 
   quickCheck (\s -> roundtrip s <?> "Test failed for input " <> show s)
 
@@ -76,8 +76,7 @@ instance arbitraryRExpr :: Arbitrary RExpr where
 
 genVar :: Gen RExpr
 genVar = do
-  t <- Gen.elements typeNames
-  R <<< (Var t) <$> genAlphaString
+  R <<< (Var T) <$> genAlphaString
 
 genApp :: Gen RExpr
 genApp = do
@@ -93,8 +92,3 @@ genFn = do
       R e <- (defer \_ -> arbitrary)
       pure $ R (Fn U v tv e)
     _ -> genFn
-
-typeNames :: NonEmpty Array Type
-typeNames = T <$> "A" :| [
-  "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "V", "W", "X", "Y", "Z"
-]

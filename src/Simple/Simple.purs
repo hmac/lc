@@ -9,14 +9,14 @@ import Untyped as U
 import Expr
 
 data Type = Arr Type Type -- a -> b
-           | T String  -- a
-           | U         -- unknown
+           | T            -- the base type
+           | U            -- unknown
 
 derive instance eqType :: Eq Type
 
 instance showType :: Show Type where
-  show (T t) = t
-  show (Arr (T t1) t2) = t1 <> " -> " <> show t2
+  show T = "T"
+  show (Arr T t2) = show T <> " -> " <> show t2
   show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
   show U = "?"
 
@@ -98,7 +98,7 @@ typecheck e@(App t f x) = do
 -- Check if two types are the same
 unify :: Type -> Type -> Boolean
 unify U U = true
-unify (T a) (T b) = a == b
+unify T T = true
 unify (Arr a b) (Arr c d) = unify a c && unify b d
 unify x y = false
 

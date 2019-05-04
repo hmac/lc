@@ -11,11 +11,11 @@ main :: Effect Unit
 main = do
   Var U "x" ~* Var U "x"
 
-  Fn U "x" (T "A") (Var U "x") ~*
-    Fn (Arr (T "A") (T "A")) "x" (T "A") (Var (T "A") "x")
+  Fn U "x" T (Var U "x") ~*
+    Fn (Arr T T) "x" T (Var T "x")
 
-  App U (Var (Arr (T "A") (T "B")) "f") (Var (T "A") "x") ~*
-    App (T "B") (Var (Arr (T "A") (T "B")) "f") (Var (T "A") "x")
+  App U (Var (Arr T T) "f") (Var T "x") ~*
+    App T (Var (Arr T T) "f") (Var T "x")
 
 infixl 5 assertInfer as ~*
 assertInfer :: Expr -> Expr -> Effect Unit
