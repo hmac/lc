@@ -6,7 +6,8 @@ jobs:
     steps:
       - checkout
       - run: sudo npm install -g pulp bower
-      - run: |
-        curl -s https://github.com/purescript/purescript/releases/download/v0.12.5/linux64.tar.gz > /tmp/purescript.tar.gz
-        tar -xvf /tmp/purescript.tar.gz
+        name: Install purescript
+        command: |
+          curl -sL https://github.com/purescript/purescript/releases/download/v0.12.5/linux64.tar.gz > /tmp/purescript.tar.gz
+          tar -xvf /tmp/purescript.tar.gz
       - run: PATH=./purescript:$PATH pulp test
