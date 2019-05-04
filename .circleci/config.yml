@@ -1,9 +1,9 @@
-version: 2.1
+version: 2
 jobs:
   build:
     docker:
       - image: circleci/node
     steps:
       - checkout
-      - run: npm install purescript pulp bower
-      - run: ./node_modules/pulp/index.js test
+      - run: sudo npm install -g purescript pulp bower
+      - run: pulp test
