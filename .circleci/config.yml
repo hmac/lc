@@ -5,5 +5,5 @@ jobs:
       - image: circleci/node
     steps:
       - checkout
-      - run: npm install -g purescript pulp bower
-      - run: pulp test
+      - run: npm install purescript pulp bower
+      - run: ./node_modules/pulp/index.js test
