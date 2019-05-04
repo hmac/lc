@@ -162,7 +162,7 @@ reduce ctx (App t1 (App t2 (App t3 (Var trec "Rec") h) a) n)
   = case reduce ctx n of
          (Var _ "Zero") -> reduce ctx a
          (App _ (Var _ "Succ") n') -> let rec = App t2 (App t2 (App t3 (Var trec "Rec") h) a) n'
-                                       in infer ctx $ App U (App U h n) rec
+                                       in infer ctx $ App U (App U h n') rec
          n' -> App t1 (App t2 (App t3 (Var trec "Rec") h) a) n'
 
 -- the other rules are identical to the untyped LC
