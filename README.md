@@ -9,5 +9,5 @@ Current implementations:
 
 - [x] Untyped Lambda Calculus
 - [x] Simply Typed Lambda Calculus
-- [ ] System T (missing a parser)
+- [x] System T
 - [ ] System F
