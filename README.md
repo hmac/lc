@@ -11,3 +11,12 @@ Current implementations:
 - [x] Simply Typed Lambda Calculus
 - [x] System T
 - [ ] System F
+
+## Try it out
+
+A minimal UI for playing around with these languages is hosted
+[here](https://hmac.dev/lc/index.html).
+
+To run locally, install
+[Purescript](https://github.com/purescript/documentation/blob/master/guides/Getting-Started.md)
+and run `bower install` and `pulp build`. Then open `index.html`.
