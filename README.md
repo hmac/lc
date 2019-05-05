@@ -1,5 +1,7 @@
 # lc
 
+[![CircleCI](https://circleci.com/gh/hmac/lc.svg?style=svg)](https://circleci.com/gh/hmac/lc)
+
 lc is a collection of experimental Lambda Calculus evaluators. It's a playground for
 exploring different type systems.
 
