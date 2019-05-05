@@ -1,9 +1,11 @@
-module Simple.Parse (parseExpr, parseAssign) where
+module Simple.Parse (parseProgram, parseExpr) where
 
 import Prelude
 
 import Text.Parsing.Parser (ParseError)
 import Data.Either
+import Data.List
+import Data.Map (Map)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 
@@ -16,14 +18,15 @@ simpleConfig :: Parse.Config Type
 simpleConfig = { mkNat: mkChurchNumeral
                , nullType: U
                , arrowType: Arr
-               , parseType: const T
+               , parseType: (\t -> if t == "T" then T else C t)
                }
 
+-- Used in tests
 parseExpr :: String -> Either ParseError Expr
 parseExpr = Parse.parseExpr simpleConfig
 
-parseAssign :: String -> Either ParseError (Tuple String Expr)
-parseAssign = Parse.parseAssign simpleConfig
+parseProgram :: String -> Either ParseError (Tuple (Map String Expr) (Map String Type))
+parseProgram = Parse.parseProgram simpleConfig
 
 mkChurchNumeral :: Int -> Expr
 mkChurchNumeral 0 = zero

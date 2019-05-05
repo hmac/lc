@@ -20,20 +20,20 @@ main :: Effect Unit
 main = do
   "x" ~> Var U "x"
   "y" ~> Var U "y"
-  "x : A" ~> Var T "x"
-  "x : B" ~> Var T "x"
-  "(f : (A -> B)) (x : A)" ~> App U (Var (Arr T T) "f") (Var T "x")
-  "f : A -> B x : A" ~> App U (Var (Arr T T) "f") (Var T "x")
+  "x : T" ~> Var T "x"
+  "x : A" ~> Var (C "A") "x"
+  "(f : (T -> T)) (x : T)" ~> App U (Var (Arr T T) "f") (Var T "x")
+  "f : T -> T x : T" ~> App U (Var (Arr T T) "f") (Var T "x")
 
   "f x" ~> App U (Var U "f") (Var U "x")
-  "f (x : A)" ~> App U (Var U "f") (Var T "x")
-  "f (x : B)" ~> App U (Var U "f") (Var T "x")
+  "f (x : T)" ~> App U (Var U "f") (Var T "x")
+  "f (x : T)" ~> App U (Var U "f") (Var T "x")
 
   "\\x. x" ~> Fn U "x" U (Var U "x")
   "λx. x" ~> Fn U "x" U (Var U "x")
-  "\\x : A. x" ~> Fn U "x" T (Var U "x")
-  "\\x : B. x" ~> Fn U "x" T (Var U "x")
-  "\\f : A -> B. \\x : A. f x" ~>
+  "\\x : T. x" ~> Fn U "x" T (Var U "x")
+  "\\x : T. x" ~> Fn U "x" T (Var U "x")
+  "\\f : T -> T. \\x : T. f x" ~>
     Fn U "f" (Arr T T) (Fn U "x" T (App U (Var U "f") (Var U "x")))
 
   quickCheck (\s -> roundtrip s <?> "Test failed for input " <> show s)

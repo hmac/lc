@@ -1,14 +1,14 @@
-module Parse (parseExpr, parseAssign, Config(..)) where
+module Parse (parseExpr, parseAssign, Config(..), parseProgram) where
 
 -- This module parses the lambda calculus, producing an AST
 -- It's parameterised over the type of type annotations - construct a Config to tell
 -- the parser how to interpret type annotations and it'll do the rest.
 
-import Prelude (bind, otherwise, pure, ($), (-), (<), (<$>), (<<<), (<>), discard, (*>), (==))
+import Prelude
 
 import Text.Parsing.Parser (Parser, ParseError, runParser, fail)
-import Text.Parsing.Parser.Combinators (between, sepBy1, option)
-import Text.Parsing.Parser.String (string, oneOf, skipSpaces)
+import Text.Parsing.Parser.Combinators (between, sepBy, sepBy1, option, optional)
+import Text.Parsing.Parser.String (string, oneOf, skipSpaces, char, noneOf)
 
 import Control.Lazy (fix)
 import Data.Either
@@ -20,6 +20,8 @@ import Global (readInt)
 import Data.Int (fromNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Data.Map (Map)
+import Data.Map as Map
 
 import Expr
 
@@ -36,6 +38,52 @@ parseExpr cfg input = runParser input (expr cfg)
 
 parseAssign :: forall t. Config t -> String -> Either ParseError (Tuple String (ExprT t))
 parseAssign cfg input = runParser input (assign cfg)
+
+parseProgram :: forall t. Config t -> String -> Either ParseError (Tuple (Map String (ExprT t)) (Map String t))
+parseProgram cfg input = do
+  defs <- runParser input (program cfg)
+  pure $
+    foldl (\(Tuple es ts) d -> case d of
+                TypeDef s t -> Tuple es (Map.insert s t ts)
+                ExprDef s e -> Tuple (Map.insert s e es) ts
+          ) (Tuple mempty mempty) defs
+
+-- A program is a sequence of definitions (of types and exprs)
+-- One definition should be 'main'
+data Def t = TypeDef String t | ExprDef String (ExprT t)
+
+instance showDef :: Show t => Show (Def t) where
+  show (TypeDef s t) = "TypeDef " <> show s <> " " <> show t
+  show (ExprDef s t) = "ExprDef " <> show s <> " " <> show t
+
+program :: forall t. Config t -> P (List (Def t))
+program cfg = ((many newline) <* skipComments) *> sepBy (def cfg) ((some newline) <* skipComments)
+
+skipComments :: P Unit
+skipComments = optional $ many $ do
+  _ <- string "--"
+  _ <- many (noneOf ['\n'])
+  optional newline
+
+def :: forall t. Config t -> P (Def t)
+def cfg = do
+  name <- ident
+  skipSpaces
+  typedef cfg name <|> assign_ cfg name
+
+typedef :: forall t. Config t -> String -> P (Def t)
+typedef cfg name = do
+  _ <- char ':'
+  skipSpaces
+  t <- annotation cfg
+  pure $ TypeDef name t
+
+assign_ :: forall t. Config t -> String -> P (Def t)
+assign_ cfg name = do
+  _ <- char '='
+  skipSpaces
+  e <- expr cfg
+  pure $ ExprDef name e
 
 assign :: forall t. Config t -> P (Tuple String (ExprT t))
 assign cfg = do
@@ -125,3 +173,6 @@ alphaNum = do
   c <- oneOf alphas
   cs <- many (oneOf (alphas <> digits))
   pure $ fromCharArray $ cons c cs
+
+newline :: P String
+newline = string "\n"

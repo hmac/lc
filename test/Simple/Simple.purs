@@ -27,13 +27,13 @@ main = do
 infixl 5 assertInfer as ~
 assertInfer :: Expr -> Expr -> Effect Unit
 assertInfer input expected =
-  assertEqual { expected: expected, actual: infer mempty input }
+  assertEqual { expected: expected, actual: infer mempty mempty input }
 
 infixl 5 assertParseAndReduce as ~>
 assertParseAndReduce :: String -> String -> Effect Unit
 assertParseAndReduce inputStr expectedStr =
   let expected = stripTypes <$> parseExpr expectedStr
-      actual = nf mempty <<< infer mempty <$> parseExpr inputStr
+      actual = nf mempty <<< infer mempty mempty <$> parseExpr inputStr
    in do
       assertTrue (isRight expected)
       assertEqual { expected: expected, actual: actual }

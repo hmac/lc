@@ -1,6 +1,6 @@
 module Simple where
 
-import Prelude ((==), map, class Eq, class Show, (<>), show, Unit, unit, (&&), discard, pure)
+import Prelude
 import Data.Map (Map, lookup, insert)
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
@@ -10,38 +10,40 @@ import Expr
 
 data Type = Arr Type Type -- a -> b
            | T            -- the base type
+           | C String     -- a user-defined custom type (e.g. Bool : T -> T -> T)
            | U            -- unknown
 
 derive instance eqType :: Eq Type
 
 instance showType :: Show Type where
   show T = "T"
+  show (C n) = n
   show (Arr T t2) = show T <> " -> " <> show t2
   show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
   show U = "?"
 
 type Expr = ExprT Type
 
-type Context = Map String Expr
+type EContext = Map String Expr
+type TContext = Map String Type
 
-infer :: Context -> Expr -> Expr
+infer :: TContext -> EContext -> Expr -> Expr
 -- Typing rules:
 
 -- ctx |- t : Type  ctx |- e : t
 --------------------------------  (ANN)
 -- ctx |- (e : t) : t
---
 -- If t is a type and e is annotated with type t, then it has type t
 -- Nothing to do for this rule.
--- TODO: check that the annotated type is in the context?
+-- TODO: infer that (C "someType") is a valid type iff (C "someType") is in the context
 
 -- ctx |- e : t -> t'  ctx |- e' : t
 ------------------------------------  (APP)
 -- ctx |- ee' : t'
 
-infer ctx (App U a b) =
-  let a' = infer ctx a
-      b' = infer ctx b
+infer types ctx (App U a b) =
+  let a' = infer types ctx a
+      b' = infer types ctx b
       type_ = case getType a' of
             Arr t t' ->
               case getType b' of
@@ -54,10 +56,14 @@ infer ctx (App U a b) =
 -----------------------------  (LAM)
 -- ctx |- (λx -> e) : t -> t'
 
--- infer ctx (Fn U x U e) = U
-infer ctx (Fn U x t e) =
+infer types ctx (Fn U x (C t) e) =
+  case lookup t types of
+       Just t' -> infer types ctx (Fn U x t' e)
+       Nothing -> (Fn U x (C t) e)
+
+infer types ctx (Fn U x t e) =
   let ctx' = insert x (annotate t e) ctx
-      e' = infer ctx' e
+      e' = infer types ctx' e
       type_ = case getType e' of
                 U -> U
                 t' -> Arr t t'
@@ -66,13 +72,13 @@ infer ctx (Fn U x t e) =
 -- ctx[x] = t
 ---------------  (VAR)
 -- ctx |- x : t
-infer ctx (Var U v) =
+infer types ctx (Var U v) =
   let type_ = case lookup v ctx of
-                Just e -> getType e
+                Just e -> getType (infer types mempty e)
                 Nothing -> U
    in Var type_ v
 
-infer ctx x = x
+infer types ctx x = x
 
 -- Returns Unit if the expression typechecks.
 -- If it doesn't, it returns the subexpression which is not yet typed
@@ -122,5 +128,5 @@ stripTypes (App _ a b) = U.app (stripTypes a) (stripTypes b)
 -- Return the normal form of the given expression, if there is one.
 -- If it doesn't have a normal form, this function will hang forever.
 -- We do this by stripping away types and deferring to the untyped LC
-nf :: Context -> Expr -> U.Expr
+nf :: EContext -> Expr -> U.Expr
 nf ctx expr = U.nf (map stripTypes ctx) (stripTypes expr)

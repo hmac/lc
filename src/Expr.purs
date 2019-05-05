@@ -17,7 +17,7 @@ instance showExpr_ :: Show t => Show (ExprT t) where
 data ShowOption = ShowTypes | HideTypes | Raw
 
 showExpr :: forall t. Show t => ShowOption -> (ExprT t) -> String
-showExpr Raw (Var t v) = "(Var " <> show t <> " " <> v <> " )"
+showExpr Raw (Var t v) = "(Var " <> show t <> " " <> v <> ")"
 showExpr Raw (App t a b) = "(App " <> show t <> " " <> showExpr Raw a <> " " <> showExpr Raw b <> " )"
 showExpr Raw (Fn t v tv e) = "(Fn " <> show t <> " " <> v <> " " <> show tv <> " " <> showExpr Raw e <> " )"
 showExpr HideTypes (Var _ v) = v
