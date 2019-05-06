@@ -3,6 +3,8 @@ module SystemF where
 import Prelude
 import Data.Map
 import Data.Maybe
+import Data.List (List(..), head)
+import Data.List as List
 
 -- System F is like the STLC, but with universal quantification over types. This comes in
 -- the form of the type ΠA.x (forall A. x).
@@ -24,6 +26,7 @@ instance showType :: Show Type where
   show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
 
 data Expr = Var Type String
+          | Ty Type                   -- a type literal, used to specialise polymorphs
           | App Type Expr Expr
           | Lam Type String Type Expr
           | Forall Type String Expr
@@ -32,6 +35,7 @@ derive instance eqExpr :: Eq Expr
 
 instance showExpr_ :: Show Expr where
   show (Var a v) = v <> " : " <> show a
+  show (Ty t) = show t
   show (Lam a v va e)
     = "(λ" <> v <> " : " <> show va <> ". " <> show e <> ")" <> " : " <> show a
   show (App a x y)
@@ -51,6 +55,9 @@ infer ts es (App U a b)
         b' = infer ts es b
         t = case typeOf a' of
                  Arr t1 t2 -> if t2 == typeOf b' then t2 else U
+                 Pi ps pt -> case b' of
+                                  Ty bt -> appType ps pt (typeOf b')
+                                  _ -> U
                  _ -> U
      in App t a' b'
 infer ts es (Lam U v vt e)
@@ -80,9 +87,64 @@ typeOf (Var t _) = t
 typeOf (App t _ _) = t
 typeOf (Lam t _ _ _) = t
 typeOf (Forall t _ _) = t
+typeOf (Ty t) = t
 
-annotate :: Expr -> Type -> Expr
-annotate (Var _ v) t = Var t v
-annotate (App _ a b) t = App t a b
-annotate (Lam _ v vt e) t = Lam t v vt e
-annotate (Forall _ ts e) t = Forall t ts e
+-- reduction follows the same rules as the untyped LC, with the addition of
+-- application of types to forall terms
+
+-- A mapping from variable names to expressions
+type RContext = Map String Expr
+
+nf :: RContext -> Expr -> Expr
+nf ctx e = fromMaybe e (head (reduceList ctx e))
+
+reduceList :: RContext -> Expr -> List Expr
+reduceList ctx expr = go (List.singleton expr)
+  where go (Cons e es) = let e' = reduce ctx e
+                          in if e' == e
+                             then Cons e es
+                             else go (Cons e' (Cons e es))
+        go Nil = List.singleton expr
+
+reduce :: RContext -> Expr -> Expr
+reduce ctx (Ty t) = Ty t
+reduce ctx (Var t v) = fromMaybe (Var t v) (lookup v ctx)
+reduce ctx (App t (Lam tf v tv a) b) = subVar v a b
+reduce ctx (App t (Forall tf s a) (Ty b)) = subType s b a
+reduce ctx (App t a b) = App t (reduce ctx a) b
+reduce ctx (Lam t v tv e) = Lam t v tv (reduce ctx e)
+reduce ctx (Forall t s e) = Forall t s (reduce ctx e)
+
+
+-- Substitute an argument for a formal parameter
+-- (λx. e) a ⤳ e[a/x]
+subVar :: String -> Expr -> Expr -> Expr
+subVar v a b = go a
+  where go (Var t v') | v' == v = b
+                    | otherwise = Var t v'
+        go (Lam t v' tv e) | v' == v = Lam t v' tv e
+                     | otherwise = Lam t v' tv (go e)
+        go (App t x y) = App t (go x) (go y)
+        go (Forall t s e) = Forall t s (go e)
+        go (Ty t) = Ty t
+
+-- Substitute a type for a type variable
+-- (ΛX. e) A ⤳ e[A/X]
+-- subType s t e: substitute any occurrences of (TVar s) for t in e
+subType :: String -> Type -> Expr -> Expr
+subType s t (Ty tt) = Ty (appType s t tt)
+subType s t (Var vt v) = Var (appType s t vt) v
+subType s t (App at a b) = App (appType s t at) (subType s t a) (subType s t b)
+subType s t (Lam lt v vt e) = Lam (appType s t lt) v (appType s t vt) (subType s t e)
+subType s t (Forall ft fs e) | s == fs = Forall (appType s t ft) fs e
+                             | otherwise = Forall (appType s t ft) fs (subType s t e)
+
+-- sub s t1 t2: substitute any occurrences of (TVar s) for t1 in t2
+appType :: String -> Type -> Type -> Type
+appType s t T = T
+appType s t U = U
+appType s t (TVar v) | v == s = t
+                     | otherwise = TVar v
+appType s t (Arr a b) = Arr (appType s t a) (appType s t b)
+appType s t (Pi v a) | v == s = Pi v a
+                     | otherwise = Pi v (appType s t a)
