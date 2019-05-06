@@ -6,8 +6,17 @@ import Data.Maybe
 import Data.List (List(..), head)
 import Data.List as List
 
--- System F is like the STLC, but with universal quantification over types. This comes in
--- the form of the type ΠA.x (forall A. x).
+-- System F is like the STLC, but with universal quantification over types.
+-- We have two new terms:
+--
+-- Term                Type
+-----------------------------
+-- forall X. (e : t)   ΠX. t
+-- T                   TVar T
+--
+-- forall can only be applied to type literals, e.g.
+-- (forall X. \x : X. x) T ⤳ \x : T. x
+
 data Type = TVar String
           | Arr Type Type
           | Pi String Type
@@ -26,7 +35,7 @@ instance showType :: Show Type where
   show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
 
 data Expr = Var Type String
-          | Ty Type                   -- a type literal, used to specialise polymorphs
+          | Ty Type         -- a type literal, used to specialise polymorphs
           | App Type Expr Expr
           | Lam Type String Type Expr
           | Forall Type String Expr
