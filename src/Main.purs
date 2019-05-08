@@ -9,6 +9,7 @@ import Data.String.Utils (lines)
 import Data.List (List(..), filter, fromFoldable, reverse, partition)
 import Data.Traversable (traverse, foldr)
 import Data.FunctorWithIndex (mapWithIndex)
+import Data.FoldableWithIndex (foldrWithIndex)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
 import Data.Bifunctor (lmap, rmap)
@@ -24,6 +25,9 @@ import Simple as Simple
 
 import SystemT.Parse as SystemT.Parse
 import SystemT as SystemT
+
+import SystemF as SystemF
+import SystemF.Parse as SystemF.Parse
 
 import Expr
 
@@ -59,6 +63,17 @@ runSystemT input = either identity identity $
             Right unit -> pure $ show $ SystemT.nf ctx expr
             Left expr -> Left $ "Could not determine type of " <> show expr
        Nil -> pure "Empty input"
+
+runSystemF :: String -> String
+runSystemF input = either identity identity $ do
+  defs <- lmap show $ SystemF.Parse.parseProgram input
+  let ctx = foldrWithIndex (\name expr ctx -> Map.insert name (SystemF.infer mempty (map SystemF.typeOf ctx) expr) ctx) mempty defs
+  main <- note "'main' not found" (lookup "main" ctx)
+  let exprTypes = map SystemF.typeOf ctx
+      main' = SystemF.infer mempty exprTypes main
+  case SystemF.typecheck main' of
+       Right unit -> pure $ show $ SystemF.nf ctx main'
+       Left expr -> Left $ "Could not determine type of " <> show expr
 
 dropComments :: String -> List String
 dropComments input = filter (\s -> not (null s) && not (isComment s)) (fromFoldable (lines input))

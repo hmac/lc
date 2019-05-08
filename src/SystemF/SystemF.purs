@@ -5,6 +5,7 @@ import Data.Map
 import Data.Maybe
 import Data.List (List(..), head)
 import Data.List as List
+import Data.Either
 
 -- System F is like the STLC, but with universal quantification over types.
 -- We have two new terms:
@@ -63,9 +64,9 @@ infer ts es (App U a b)
   = let a' = infer ts es a
         b' = infer ts es b
         t = case typeOf a' of
-                 Arr t1 t2 -> if t2 == typeOf b' then t2 else U
+                 Arr t1 t2 -> if t1 == typeOf b' then t2 else U
                  Pi ps pt -> case b' of
-                                  Ty bt -> appType ps pt (typeOf b')
+                                  Ty bt -> appType ps bt pt
                                   _ -> U
                  _ -> U
      in App t a' b'
@@ -120,7 +121,7 @@ reduce ctx (Ty t) = Ty t
 reduce ctx (Var t v) = fromMaybe (Var t v) (lookup v ctx)
 reduce ctx (App t (Lam tf v tv a) b) = subVar v a b
 reduce ctx (App t (Forall tf s a) (Ty b)) = subType s b a
-reduce ctx (App t a b) = App t (reduce ctx a) b
+reduce ctx (App t a b) = App t (reduce ctx a) (reduce ctx b)
 reduce ctx (Lam t v tv e) = Lam t v tv (reduce ctx e)
 reduce ctx (Forall t s e) = Forall t s (reduce ctx e)
 
@@ -148,7 +149,7 @@ subType s t (Lam lt v vt e) = Lam (appType s t lt) v (appType s t vt) (subType s
 subType s t (Forall ft fs e) | s == fs = Forall (appType s t ft) fs e
                              | otherwise = Forall (appType s t ft) fs (subType s t e)
 
--- sub s t1 t2: substitute any occurrences of (TVar s) for t1 in t2
+-- appType s t1 t2: substitute any occurrences of (TVar s) for t1 in t2
 appType :: String -> Type -> Type -> Type
 appType s t T = T
 appType s t U = U
@@ -157,3 +158,37 @@ appType s t (TVar v) | v == s = t
 appType s t (Arr a b) = Arr (appType s t a) (appType s t b)
 appType s t (Pi v a) | v == s = Pi v a
                      | otherwise = Pi v (appType s t a)
+
+-- Returns Unit if the expression typechecks.
+-- If it doesn't, it returns the subexpression which is not yet typed
+-- TODO: check if we can simplify this, it was lifted from Simple
+typecheck :: Expr -> Either Expr Unit
+typecheck (Ty _) = Right unit
+typecheck e@(Var U _) = Left e
+typecheck e@(Lam U _ _ _) = Left e
+typecheck e@(Forall U _ _) = Left e
+typecheck e@(App U _ _) = Left e
+typecheck e@(Var t _) = Right unit
+typecheck e@(Lam t _ tv body) = do
+  typecheck body
+  if unify t (Arr tv (typeOf body))
+    then pure unit
+    else Left e
+typecheck e@(Forall t _ _) = Right unit
+typecheck e@(App t f x) = do
+  typecheck f
+  typecheck x
+  case typeOf f of
+       Arr a b -> if unify a (typeOf x) && unify b t
+                  then pure unit
+                  else Left e
+       Pi s t -> Right unit
+       _ -> Left f
+
+-- Check if two types are the same
+unify :: Type -> Type -> Boolean
+unify U U = true
+unify T T = true
+unify (Arr a b) (Arr c d) = unify a c && unify b d
+unify (TVar a) (TVar b) = a == b
+unify x y = false

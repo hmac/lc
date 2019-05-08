@@ -15,6 +15,7 @@
       <option value="untyped">Untyped Lambda Calculus</option>
       <option value="stlc">Simply Typed Lambda Calculus</option>
       <option value="systemt">System T</option>
+      <option value="systemf">System F</option>
     </select>
     <p></p>
     <textarea id="input" cols=80 rows=32>
@@ -29,10 +30,9 @@
       let runFuncs = {
         "untyped": "runUntyped",
         "stlc": "runSimple",
-        "systemt": "runSystemT"
+        "systemt": "runSystemT",
+        "systemf": "runSystemF"
       };
-
-      let run = PS["Main"].run;
 
       let input_box = document.querySelector("#input");
       let output_box = document.querySelector("#output");
