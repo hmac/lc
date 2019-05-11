@@ -51,7 +51,7 @@ instance showExpr_ :: Show Expr where
   show (App a x y)
     = "((" <> show x <> ") (" <> show y <> "))" <> " : " <> show a
   show (Forall t tyname e)
-    = "(forall " <> tyname <> ". " <> show e <> ") : " <> show t
+    = "(Λ" <> tyname <> ". " <> show e <> ") : " <> show t
 
 -- A mapping from variables names to variables types
 type EContext = Map String Type

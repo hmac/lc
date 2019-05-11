@@ -9,7 +9,7 @@ import Data.String.Utils (lines)
 import Data.List (List(..), filter, fromFoldable, reverse, partition)
 import Data.Traversable (traverse, foldr)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.FoldableWithIndex (foldrWithIndex)
+import Data.FoldableWithIndex (foldlWithIndex, foldrWithIndex, class FoldableWithIndex)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
 import Data.Bifunctor (lmap, rmap)
@@ -67,16 +67,18 @@ runSystemT input = either identity identity $
 runSystemF :: String -> String
 runSystemF input = either identity identity $ do
   defs <- lmap show $ SystemF.Parse.parseProgram input
-  let ctx = foldrWithIndex (\name expr ctx -> Map.insert name (SystemF.infer mempty (map SystemF.typeOf ctx) expr) ctx) mempty defs
+  let ctx = buildContext (\ctx e -> SystemF.infer mempty (map SystemF.typeOf ctx) e) defs
   main <- note "'main' not found" (lookup "main" ctx)
-  let exprTypes = map SystemF.typeOf ctx
-      main' = SystemF.infer mempty exprTypes main
-  case SystemF.typecheck main' of
-       Right unit -> pure $ show $ SystemF.nf ctx main'
+  case SystemF.typecheck main of
+       Right unit -> pure $ show $ SystemF.nf ctx main
        Left expr -> Left $ "Could not determine type of " <> show expr
 
 dropComments :: String -> List String
 dropComments input = filter (\s -> not (null s) && not (isComment s)) (fromFoldable (lines input))
+
+buildContext :: forall a b k. Ord k => ((Map k b) -> a -> b) -> Map k a -> Map k b
+buildContext infer defs
+  = foldlWithIndex (\name ctx expr -> Map.insert name (infer ctx expr) ctx) mempty defs
 
 mkContext :: forall a. List (Tuple String a) -> Map String a
 mkContext cs = Map.fromFoldable cs
