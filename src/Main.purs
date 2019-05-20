@@ -30,6 +30,7 @@ import SystemF as SystemF
 import SystemF.Parse as SystemF.Parse
 
 import Expr
+import Pretty
 
 main :: Effect Unit
 main = log "app loaded"
@@ -70,8 +71,8 @@ runSystemF input = either identity identity $ do
   let ctx = buildContext (\ctx e -> SystemF.infer mempty (map SystemF.typeOf ctx) e) defs
   main <- note "'main' not found" (lookup "main" ctx)
   case SystemF.typecheck main of
-       Right unit -> pure $ show $ SystemF.nf ctx main
-       Left expr -> Left $ "Could not determine type of " <> show expr
+       Right unit -> pure $ pretty $ SystemF.nf ctx main
+       Left expr -> Left $ "Could not determine type of " <> pretty expr
 
 dropComments :: String -> List String
 dropComments input = filter (\s -> not (null s) && not (isComment s)) (fromFoldable (lines input))

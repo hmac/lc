@@ -6,6 +6,9 @@ import Data.Maybe
 import Data.List (List(..), head)
 import Data.List as List
 import Data.Either
+import Pretty
+import Data.Generic.Rep
+import Data.Generic.Rep.Show
 
 -- System F is like the STLC, but with universal quantification over types.
 -- We have two new terms:
@@ -26,14 +29,19 @@ data Type = TVar String
 
 derive instance eqType :: Eq Type
 
+derive instance genericType :: Generic Type _
+
 instance showType :: Show Type where
-  show T = "T"
-  show U = "?"
-  show (TVar n) = n
-  show (Pi name t) = "Π" <> name <> ". " <> show t
-  show (Arr T t2) = show T <> " -> " <> show t2
-  show (Arr (TVar t1) t2) = t1 <> " -> " <> show t2
-  show (Arr t1 t2) = "(" <> show t1 <> ") -> " <> show t2
+  show t = genericShow t
+
+instance prettyType :: Pretty Type where
+  pretty T = "T"
+  pretty U = "?"
+  pretty (TVar n) = n
+  pretty (Pi name t) = "Π" <> name <> ". " <> pretty t
+  pretty (Arr T t2) = pretty T <> " -> " <> pretty t2
+  pretty (Arr (TVar t1) t2) = t1 <> " -> " <> pretty t2
+  pretty (Arr t1 t2) = "(" <> pretty t1 <> ") -> " <> pretty t2
 
 data Expr = Var Type String
           | Ty Type         -- a type literal, used to specialise polymorphs
@@ -43,15 +51,20 @@ data Expr = Var Type String
 
 derive instance eqExpr :: Eq Expr
 
-instance showExpr_ :: Show Expr where
-  show (Var a v) = v <> " : " <> show a
-  show (Ty t) = show t
-  show (Lam a v va e)
-    = "(λ" <> v <> " : " <> show va <> ". " <> show e <> ")" <> " : " <> show a
-  show (App a x y)
-    = "((" <> show x <> ") (" <> show y <> "))" <> " : " <> show a
-  show (Forall t tyname e)
-    = "(Λ" <> tyname <> ". " <> show e <> ") : " <> show t
+derive instance genericExpr :: Generic Expr _
+
+instance showExpr :: Show Expr where
+  show e = genericShow e
+
+instance prettyExpr :: Pretty Expr where
+  pretty (Var a v) = v <> " : " <> pretty a
+  pretty (Ty t) = pretty t
+  pretty (Lam a v va e)
+    = "(λ" <> v <> " : " <> pretty va <> ". " <> pretty e <> ")" <> " : " <> pretty a
+  pretty (App a x y)
+    = "((" <> pretty x <> ") (" <> pretty y <> "))" <> " : " <> pretty a
+  pretty (Forall t tyname e)
+    = "(Λ" <> tyname <> ". " <> pretty e <> ") : " <> pretty t
 
 -- A mapping from variables names to variables types
 type EContext = Map String Type
