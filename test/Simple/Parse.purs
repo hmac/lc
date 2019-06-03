@@ -4,11 +4,15 @@ import Prelude
 import Effect (Effect)
 import Test.Assert (assertEqual)
 import Data.Either (Either(..))
-import Test.QuickCheck (class Arbitrary, arbitrary, quickCheck, (<?>))
+import Test.QuickCheck (class Arbitrary, arbitrary, (<?>))
 import Test.QuickCheck.Gen (Gen)
 import Test.QuickCheck.Gen as Gen
 import Data.NonEmpty ((:|))
 import Control.Lazy (defer)
+
+import Test.Spec (describe, it, Spec)
+import Test.Spec.Assertions (shouldEqual)
+import Test.Spec.QuickCheck (quickCheck)
 
 import Data.String.Gen (genAlphaString)
 
@@ -16,32 +20,35 @@ import Simple.Parse (parseExpr)
 import Expr
 import Simple (Expr, Type(..))
 
-main :: Effect Unit
-main = do
-  "x" ~> Var U "x"
-  "y" ~> Var U "y"
-  "x : T" ~> Var T "x"
-  "x : A" ~> Var (C "A") "x"
-  "(f : (T -> T)) (x : T)" ~> App U (Var (Arr T T) "f") (Var T "x")
-  "f : T -> T x : T" ~> App U (Var (Arr T T) "f") (Var T "x")
+main :: Spec Unit
+main = describe "Simple" do
+  describe "Parsing" do
+    "x" ~> Var U "x"
+    "y" ~> Var U "y"
+    "x : T" ~> Var T "x"
+    "x : A" ~> Var (C "A") "x"
+    "(f : (T -> T)) (x : T)" ~> App U (Var (Arr T T) "f") (Var T "x")
+    "f : T -> T x : T" ~> App U (Var (Arr T T) "f") (Var T "x")
 
-  "f x" ~> App U (Var U "f") (Var U "x")
-  "f (x : T)" ~> App U (Var U "f") (Var T "x")
-  "f (x : T)" ~> App U (Var U "f") (Var T "x")
+    "f x" ~> App U (Var U "f") (Var U "x")
+    "f (x : T)" ~> App U (Var U "f") (Var T "x")
+    "f (x : T)" ~> App U (Var U "f") (Var T "x")
 
-  "\\x. x" ~> Fn U "x" U (Var U "x")
-  "λx. x" ~> Fn U "x" U (Var U "x")
-  "\\x : T. x" ~> Fn U "x" T (Var U "x")
-  "\\x : T. x" ~> Fn U "x" T (Var U "x")
-  "\\f : T -> T. \\x : T. f x" ~>
-    Fn U "f" (Arr T T) (Fn U "x" T (App U (Var U "f") (Var U "x")))
+    "\\x. x" ~> Fn U "x" U (Var U "x")
+    "λx. x" ~> Fn U "x" U (Var U "x")
+    "\\x : T. x" ~> Fn U "x" T (Var U "x")
+    "\\x : T. x" ~> Fn U "x" T (Var U "x")
+    "\\f : T -> T. \\x : T. f x" ~>
+      Fn U "f" (Arr T T) (Fn U "x" T (App U (Var U "f") (Var U "x")))
 
-  quickCheck (\s -> roundtrip s <?> "Test failed for input " <> show s)
+    it "satisfies the roundtrip property" do
+      quickCheck (\s -> roundtrip s <?> "Test failed for input " <> show s)
 
 infixl 5 assertParse as ~>
-assertParse :: String -> Expr -> Effect Unit
+assertParse :: String -> Expr -> Spec Unit
 assertParse input expected =
-  assertEqual { expected: Right expected, actual: parseExpr input }
+  it ("parses " <> input <> " correctly") do
+     parseExpr input `shouldEqual` Right expected
 
 roundtrip :: RExpr -> Boolean
 roundtrip (R e) =
