@@ -10,7 +10,8 @@ Current implementations:
 - [x] Untyped Lambda Calculus
 - [x] Simply Typed Lambda Calculus
 - [x] System T
-- [ ] System F
+- [x] System F
+- [x] Hindley-Milner
 
 ## Try it out
 
