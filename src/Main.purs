@@ -6,7 +6,7 @@ import Effect.Console (log)
 import Data.Either
 import Data.Maybe
 import Data.String.Utils (lines)
-import Data.List (List(..), filter, fromFoldable, reverse, partition)
+import Data.List (List(..), filter, fromFoldable, reverse, partition, foldl)
 import Data.Traversable (traverse, foldr)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.FoldableWithIndex (foldlWithIndex, foldrWithIndex, class FoldableWithIndex)
@@ -28,6 +28,10 @@ import SystemT as SystemT
 
 import SystemF as SystemF
 import SystemF.Parse as SystemF.Parse
+
+import HM as HM
+import HM.Eval as HM.Eval
+import HM.Parse as HM.Parse
 
 import Expr
 import Pretty
@@ -73,6 +77,18 @@ runSystemF input = either identity identity $ do
   case SystemF.typecheck main of
        Right unit -> pure $ pretty $ SystemF.nf ctx main
        Left expr -> Left $ "Could not determine type of " <> pretty expr
+
+runHM :: String -> String
+runHM input = either identity identity $ do
+  defs <- lmap show $ HM.Parse.parseProgram input
+  main <- note "'main' not found" (lookup "main" defs)
+  let expr = constructOuterLet (Map.delete "main" defs) main
+  case HM.runInfer' mempty expr of
+       Right t -> pure $ (pretty (HM.Eval.nf mempty expr)) <> " : " <> pretty t
+       Left err -> Left err
+
+constructOuterLet :: Map String HM.Expr -> HM.Expr -> HM.Expr
+constructOuterLet defs main = foldlWithIndex (\v acc e -> HM.Let v e acc) main defs
 
 dropComments :: String -> List String
 dropComments input = filter (\s -> not (null s) && not (isComment s)) (fromFoldable (lines input))

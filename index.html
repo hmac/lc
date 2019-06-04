@@ -23,6 +23,7 @@
       <option value="stlc">Simply Typed Lambda Calculus</option>
       <option value="systemt">System T</option>
       <option value="systemf">System F</option>
+      <option value="hm">Hindley-Milner</option>
     </select>
     <p></p>
     <textarea id="input" cols=80 rows=32>
@@ -38,7 +39,8 @@
         "untyped": "runUntyped",
         "stlc": "runSimple",
         "systemt": "runSystemT",
-        "systemf": "runSystemF"
+        "systemf": "runSystemF",
+        "hm": "runHM"
       };
 
       let input_box = document.querySelector("#input");
