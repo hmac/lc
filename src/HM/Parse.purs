@@ -3,7 +3,7 @@ module HM.Parse where
 import Prelude
 
 import Text.Parsing.Parser (Parser, ParseError, runParser, fail)
-import Text.Parsing.Parser.Combinators (between, sepBy, sepBy1, option, optional, try)
+import Text.Parsing.Parser.Combinators (between, sepBy, sepBy1)
 import Text.Parsing.Parser.String (string, oneOf, skipSpaces, char, noneOf)
 
 import Control.Lazy (fix)
@@ -66,12 +66,16 @@ expr' :: P Expr -> P Expr
 expr' p = app p <|> aexpr p
 
 aexpr :: P Expr -> P Expr
-aexpr p = parens expr <|> unit_ <|> lam p <|> let_ p <|> var
+aexpr p = parens expr <|> unit_ <|> lam p <|> let_ p <|> bool <|> var
 
 unit_ :: P Expr
 unit_ = do
   _ <- string "unit"
   pure Unit
+
+bool :: P Expr
+bool = string "True" $> True
+   <|> string "False" $> False
 
 lam :: P Expr -> P Expr
 lam p = do

@@ -23,6 +23,7 @@ import NameGen
 data Type = TVar String
           | Arr Type Type
           | T -- the unit type
+          | TBool
 
 derive instance eqType :: Eq Type
 
@@ -33,6 +34,7 @@ instance showType :: Show Type where
 
 instance prettyType :: Pretty Type where
   pretty T = "T"
+  pretty TBool = "Bool"
   pretty (TVar n) = n
   pretty (Arr T t2) = pretty T <> " -> " <> pretty t2
   pretty (Arr (TVar t1) t2) = t1 <> " -> " <> pretty t2
@@ -55,6 +57,8 @@ data Expr = Var String
           | Lam String Expr
           | Let String Expr Expr
           | Unit -- the unit value
+          | True
+          | False
 
 derive instance eqExpr :: Eq Expr
 
@@ -65,6 +69,8 @@ instance showExpr :: Show Expr where
 
 instance prettyExpr :: Pretty Expr where
   pretty Unit = "()"
+  pretty True = "True"
+  pretty False = "False"
   pretty (Var v) = v
   pretty (Lam v e)
     = "(λ" <> v <> ". " <> pretty e <> ")"
@@ -187,13 +193,15 @@ varBind v t | t == TVar v = Right mempty -- don't bind a variable to itself
             | otherwise = Right $ Subst $ Map.singleton v t
 
 infer :: Env -> Expr -> NameGen (Either String (Tuple Subst Type))
+infer env Unit = pure $ Right (Tuple mempty T)
+infer env True = pure $ Right (Tuple mempty TBool)
+infer env False = pure $ Right (Tuple mempty TBool)
 infer env (Var v) =
   case lookup v env of
        Just sigma -> do
           t <- instantiate sigma
           pure $ Right (Tuple mempty t)
        Nothing -> pure $ Left $ "Unbound variable: " <> v
-infer env Unit = pure $ Right (Tuple mempty T)
 infer env (Lam x e) = do
   tv <- newVar
   let env' = env <> singletonEnv x (Forall mempty tv)
@@ -244,5 +252,5 @@ getVars (Var v) = Set.singleton v
 getVars (Lam x e) = Set.insert x (getVars e)
 getVars (App a b) = getVars a <> getVars b
 getVars (Let x e1 e2) = Set.insert x (getVars e1 <> getVars e2)
-getVars Unit = mempty
+getVars e = mempty
 

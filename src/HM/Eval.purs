@@ -37,8 +37,8 @@ reduce ctx (App (Var v) b) = case lookup v ctx of
                                Just e -> App e b
                                Nothing -> (App (Var v) (reduce ctx b))
 reduce ctx (App a b) = App (reduce ctx a) (reduce ctx b) -- do we need to reduce the argument?
-reduce ctx Unit = Unit
 reduce ctx (Let v e0 e1) = substitute v e1 e0
+reduce ctx e = e -- Unit, True, False
 
 -- Substitute an argument for a function parameter
 -- (λx. e) a ⤳ e[a/x]
@@ -46,9 +46,9 @@ substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = go a
   where go (Var v') | v' == v = b
                     | otherwise = Var v'
-        go Unit = Unit
         go (Lam v' e) | v' == v = Lam v' e
                      | otherwise = Lam v' (go e)
         go (App x y) = App (go x) (go y)
         go (Let v' e0 e1) | v' == v = Let v' e0 e1
                           | otherwise = Let v' (go e0) (go e1)
+        go e = e -- Unit, True, False
