@@ -1,14 +1,16 @@
-module HM.Eval (nf) where
+module HM.Eval (nf, runPrim, reduce) where
 
 import Prelude
 
-import Data.Map (Map, lookup)
-import Data.List (List(..))
+import Data.Tuple
+import Data.Map as Map
+import Data.Map (Map, lookup, member)
+import Data.List (List(..), singleton, length, head, last, snoc)
 import Data.NonEmpty as NonEmpty
 import Data.NonEmpty (NonEmpty(..), (:|))
 import Data.Maybe (Maybe(..), fromMaybe)
 
-import HM (Expr(..))
+import HM (Expr(..), Type(..), builtins)
 
 type Context = Map String Expr
 
@@ -33,11 +35,17 @@ reduce :: Context -> Expr -> Expr
 reduce ctx (Var v) = fromMaybe (Var v) (lookup v ctx)
 reduce ctx (Lam v a) = Lam v (reduce ctx a)
 reduce ctx (App (Lam v a) b) = substitute v a b
-reduce ctx (App (Var v) b) = case lookup v ctx of
-                               Just e -> App e b
-                               Nothing -> (App (Var v) (reduce ctx b))
-reduce ctx (App a b) = App (reduce ctx a) (reduce ctx b) -- do we need to reduce the argument?
+reduce ctx (App (Var v) b) | Just e <- lookup v ctx = App e b
+                           | Just prim <- lookup v builtins = App prim b
+                           | otherwise = App (Var v) (reduce ctx b)
+reduce ctx (App (Prim n arity t args) b)
+  | arity > length args = Prim n arity t (snoc args (nf ctx b)) -- heads up, we use nf here
+  | otherwise = App (reduce ctx (Prim n arity t args)) b
+reduce ctx (App a b) = App (reduce ctx a) (reduce ctx b)
 reduce ctx (Let v e0 e1) = substitute v e1 e0
+reduce ctx (Prim name arity ty args)
+  | arity == length args = runPrim name arity ty args
+  | otherwise = Prim name arity ty args
 reduce ctx e = e -- Unit, True, False
 
 -- Substitute an argument for a function parameter
@@ -51,4 +59,21 @@ substitute v a b = go a
         go (App x y) = App (go x) (go y)
         go (Let v' e0 e1) | v' == v = Let v' e0 e1
                           | otherwise = Let v' (go e0) (go e1)
-        go e = e -- Unit, True, False
+        go e = e -- Unit, True, False, integer, primitive
+
+runPrim :: String -> Int -> Type -> List Expr -> Expr
+runPrim "add" arity (Arr TInt (Arr TInt TInt)) args =
+  let default = Prim "mul" arity (Arr TInt (Arr TInt TInt)) args
+   in case head args of
+       Just (IntLit a) -> case last args of
+                      Just (IntLit b) -> IntLit (a + b)
+                      _ -> default
+       _ -> default
+runPrim "mul" arity (Arr TInt (Arr TInt TInt)) args =
+  let default = Prim "mul" arity (Arr TInt (Arr TInt TInt)) args
+   in case head args of
+       Just (IntLit a) -> case last args of
+                            Just (IntLit b) -> IntLit (a * b)
+                            _ -> default
+       _ -> default
+runPrim n a t args = Prim n a t args

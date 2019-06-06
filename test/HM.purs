@@ -20,11 +20,17 @@ main = describe "Hindley-Milner" do
     "\\x. x" ~ Arr (TVar "a") (TVar "a")
     "let f = (\\t. unit) in let x = (\\t. t) in f x" ~ T
     "let x = True in (\\x. x) x" ~ TBool
+    "let x = 1 in x" ~ TInt
+    "let add = #add in (add 1 2)" ~ TInt
+    "let mul = #mul in (mul 1 2)" ~ TInt
 
   describe "reduction" do
     "True" ~> "True"
     "let f = (\\t. unit) in let x = (\\t. t) in f x" ~> "unit"
     "let const = (\\x. \\y. x) in const True False" ~> "True"
+    "let add = #add in (add 1 2)" ~> "3"
+    "let x = 1 in let add = #add in (add (add x x) x)" ~> "3"
+    "let mul = #mul in (mul 1 2)" ~> "2"
 
 
 infixl 5 assertParseAndInfer as ~

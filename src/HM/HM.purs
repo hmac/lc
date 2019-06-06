@@ -22,8 +22,9 @@ import NameGen
 
 data Type = TVar String
           | Arr Type Type
-          | T -- the unit type
+          | T
           | TBool
+          | TInt
 
 derive instance eqType :: Eq Type
 
@@ -35,6 +36,7 @@ instance showType :: Show Type where
 instance prettyType :: Pretty Type where
   pretty T = "T"
   pretty TBool = "Bool"
+  pretty TInt = "Int"
   pretty (TVar n) = n
   pretty (Arr T t2) = pretty T <> " -> " <> pretty t2
   pretty (Arr (TVar t1) t2) = t1 <> " -> " <> pretty t2
@@ -59,6 +61,8 @@ data Expr = Var String
           | Unit -- the unit value
           | True
           | False
+          | IntLit Int
+          | Prim String Int Type (List Expr) -- name, arity, accumulated args
 
 derive instance eqExpr :: Eq Expr
 
@@ -71,13 +75,21 @@ instance prettyExpr :: Pretty Expr where
   pretty Unit = "()"
   pretty True = "True"
   pretty False = "False"
+  pretty (Prim name arity _ _) = "#" <> name <> "/" <> show arity
+  pretty (IntLit i) = show i
   pretty (Var v) = v
   pretty (Lam v e)
     = "(λ" <> v <> ". " <> pretty e <> ")"
-  pretty (App x y)
-    = "" <> pretty x <> " " <> pretty y <> ""
+  pretty (App x y) = pretty x <> " " <> pretty y -- TODO: make this work for nested apps
   pretty (Let x e1 e2)
     = "let " <> x <> " = " <> pretty e1 <> " in " <> pretty e2
+
+-- Built-in functions
+builtins :: Map String Expr
+builtins = Map.fromFoldable [
+    (Tuple "add" (Prim "add" 2 (Arr TInt (Arr TInt TInt)) mempty))
+  , (Tuple "mul" (Prim "mul" 2 (Arr TInt (Arr TInt TInt)) mempty))
+  ]
 
 newtype Subst = Subst (Map String Type)
 
@@ -184,7 +196,7 @@ mgu (Arr a1 b1) (Arr a2 b2) = do
               Right s2 -> pure $ Right (s1 <> s2)
 mgu (TVar v) t = pure $ varBind v t
 mgu t (TVar v) = pure $ varBind v t
-mgu T T = pure $ Right mempty
+mgu a b | a == b = pure $ Right mempty
 mgu t1 t2 = pure $ Left $ "Cannot unify " <> pretty t1 <> " and " <> pretty t2
 
 varBind :: String -> Type -> Either String Subst
@@ -196,6 +208,8 @@ infer :: Env -> Expr -> NameGen (Either String (Tuple Subst Type))
 infer env Unit = pure $ Right (Tuple mempty T)
 infer env True = pure $ Right (Tuple mempty TBool)
 infer env False = pure $ Right (Tuple mempty TBool)
+infer env (Prim _ _ t _) = pure $ Right (Tuple mempty t)
+infer env (IntLit _) = pure $ Right (Tuple mempty TInt)
 infer env (Var v) =
   case lookup v env of
        Just sigma -> do

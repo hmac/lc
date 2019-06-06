@@ -24,6 +24,19 @@ import HM
 -- For simplicity, we require that all type variables are Titlecase and
 -- all term variables are lowercase.
 
+-- The syntax of this language is as follows:
+-- a,b := unit             the unit type
+--      | \x. a            lambda abstraction
+--      | let x = a in b   let expressions
+--      | a b              application
+--      | True             booleans
+--      | False
+--      | integer          integers
+--      | (a)              expressions in parentheses
+--      | #name            primitive functions (e.g. #add)
+--
+-- integer := 1 | 2 | ...
+
 type P = Parser String
 
 parseExpr :: String -> Either ParseError Expr
@@ -66,7 +79,7 @@ expr' :: P Expr -> P Expr
 expr' p = app p <|> aexpr p
 
 aexpr :: P Expr -> P Expr
-aexpr p = parens expr <|> unit_ <|> lam p <|> let_ p <|> bool <|> var
+aexpr p = parens expr <|> unit_ <|> lam p <|> let_ p <|> bool <|> int <|> prim <|> var
 
 unit_ :: P Expr
 unit_ = do
@@ -76,6 +89,21 @@ unit_ = do
 bool :: P Expr
 bool = string "True" $> True
    <|> string "False" $> False
+
+int :: P Expr
+int = do
+  n <- readInt 10 <<< fromCharArray <$> some (oneOf digits)
+  case fromNumber n of
+    Just i -> pure (IntLit i)
+    Nothing -> fail "cannot parse number"
+
+prim :: P Expr
+prim = do
+  _ <- string "#"
+  name <- termName
+  case Map.lookup name builtins of
+       Just p -> pure p
+       Nothing -> fail $ "unrecognised primitive: " <> name
 
 lam :: P Expr -> P Expr
 lam p = do
