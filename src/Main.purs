@@ -16,6 +16,7 @@ import Data.Bifunctor (lmap, rmap)
 import Data.Map as Map
 import Data.Map (Map, lookup)
 import Data.String.Regex (regex, test)
+import Control.Monad.Except (runExcept)
 
 import Untyped.Parse as ParseUntyped
 import Untyped as Untyped
@@ -95,8 +96,11 @@ runDependent input = either identity identity $ do
   defs <- lmap show $ D.Parse.parseProgram input
   main <- note "'main' not found" (lookup "main" defs)
   -- For now we just typecheck+eval main and ignore the rest
-  let {expr: e, type: t} = D.infer mempty main
-  pure $ (pretty (D.nf e)) <> " : " <> pretty t
+  let res = runExcept (D.infer mempty main)
+  case res of
+    Left e -> pure e
+    Right {expr: e, type: t} ->
+      pure $ (pretty (D.nf e)) <> " : " <> pretty t
 
 constructOuterLet :: Map String HM.Expr -> HM.Expr -> HM.Expr
 constructOuterLet defs main = foldlWithIndex (\v acc e -> HM.Let v e acc) main defs

@@ -1,11 +1,13 @@
 module Dependent.Dependent where
 
 import Prelude
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Map (Map, lookup, insert)
 import Data.List (List(..), singleton)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Control.Monad.Except
 
 import Pretty (class Pretty, pretty)
 
@@ -39,55 +41,65 @@ type Context = Map String Expr
 -- infer infers a type from an expression
 -- check checks that an expression has the given type
 
-infer :: Context -> Expr -> {expr :: Expr, type :: Expr}
+infer :: Context -> Expr -> Except String {expr :: Expr, type :: Expr}
 
 -- ANN
-infer ctx (Ann e t)
-  | check ctx t Type
-  = let t' = nf t
-     in if check ctx e t'
-        then {expr: Ann e t', type: t'}
-        else {expr: Ann e t', type: U}
+infer ctx (Ann e t) = do
+  _ <- check ctx t Type
+  let t' = nf t
+  _ <- check ctx e t'
+  pure {expr: Ann e t', type: t'}
 
 -- TYPE
-infer ctx Type = {expr: Type, type: Type}
+infer ctx Type = pure {expr: Type, type: Type}
 
 -- VAR
 infer ctx (Var v) =
   case lookup v ctx of
-       Just t -> {expr: (Var v), type: t}
-       Nothing -> {expr: (Var v), type: U}
+    Just t -> pure {expr: (Var v), type: t}
+    Nothing -> throwError $ "could not determine type of variable " <> v
 
 -- PI
-infer ctx (Pi x t e)
-  | check ctx t Type
-  , check (insert x (infer ctx t).expr ctx) e Type
-  = {expr: Pi x t e, type: Type}
+infer ctx (Pi x t e) = do
+  _ <- check ctx t Type
+  let t' = nf t
+  let ctx' = insert x t' ctx
+  _ <- check ctx' e Type
+  pure {expr: Pi x t e, type: Type}
 
 -- APP
-infer ctx (App e e') =
-  case (infer ctx e).type of
-       Pi x t t' ->
-         if check ctx e' t
-         then let t'' = substitute x t' e'
-               in {expr: App e e', type: t''}
-         else {expr: App e e', type: U}
-       _ -> {expr: App e e', type: U}
+infer ctx (App e e') = do
+  et <- infer ctx e
+  case et.type of
+    Pi x t t' -> do
+      _ <- check ctx e' t
+      let t'' = substitute x t' e'
+      pure {expr: App e e', type: t''}
+    t -> throwError $ "expected " <> pretty e <> " to be a Pi type, but was inferred to be " <> pretty t
 
 -- Fallthrough
-infer ctx e = {expr: e, type: U}
+infer ctx e = throwError $ "could not infer type of " <> pretty e
 
-check :: Context -> Expr -> Expr -> Boolean
+-- TODO: make into an Except
+check :: Context -> Expr -> Expr -> Except String Unit
 
 -- LAM
-check ctx (Lam x e) (Pi x' t t') =
-  let ctx' = insert x t ctx
-   in x == x' && check ctx' e t'
+check ctx (Lam x e) (Pi x' t t')
+  = do
+      let ctx' = insert x t ctx
+      _ <- check ctx' e t'
+      pure unit
 
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
 -- 𝚪 ⊢ e :↓ t
-check ctx e t = (infer ctx e).type == t
+check ctx e t
+  = case runExcept (infer ctx e) of
+      Left err -> throwError err
+      Right {type: t'} ->
+        if t' == t
+          then pure unit
+          else throwError $ "could not infer that " <> pretty e <> " has type " <> pretty t
 
 
 -- Return the normal form of the given expression, if there is one.
