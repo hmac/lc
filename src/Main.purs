@@ -33,6 +33,9 @@ import HM as HM
 import HM.Eval as HM.Eval
 import HM.Parse as HM.Parse
 
+import Dependent.Dependent as D
+import Dependent.Parse as D.Parse
+
 import Expr
 import Pretty
 
@@ -86,6 +89,14 @@ runHM input = either identity identity $ do
   case HM.runInfer' mempty expr of
        Right t -> pure $ (pretty (HM.Eval.nf mempty expr)) <> " : " <> pretty t
        Left err -> Left err
+
+runDependent :: String -> String
+runDependent input = either identity identity $ do
+  defs <- lmap show $ D.Parse.parseProgram input
+  main <- note "'main' not found" (lookup "main" defs)
+  -- For now we just typecheck+eval main and ignore the rest
+  let {expr: e, type: t} = D.infer mempty main
+  pure $ (pretty (D.nf e)) <> " : " <> pretty t
 
 constructOuterLet :: Map String HM.Expr -> HM.Expr -> HM.Expr
 constructOuterLet defs main = foldlWithIndex (\v acc e -> HM.Let v e acc) main defs

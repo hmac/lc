@@ -1,12 +1,13 @@
 module Dependent.Dependent where
 
 import Prelude
-import Data.Maybe (maybe, Maybe(..))
+import Data.Maybe (Maybe(..))
 import Data.Map (Map, lookup, insert)
-import Data.Map as Map
 import Data.List (List(..), singleton)
-import Data.Generic.Rep
-import Data.Generic.Rep.Show
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+
+import Pretty (class Pretty, pretty)
 
 -- Values, Types and Kinds are all Exprs
 data Expr = Var String          -- x
@@ -22,65 +23,72 @@ derive instance genericExpr :: Generic Expr _
 instance showExpr :: Show Expr where
   show t = genericShow t
 
--- TODO: this could probably be List (Tuple Expr Expr)
+instance prettyType :: Pretty Expr where
+  pretty (Var v) = v
+  pretty (Ann e t) = pretty e <> " : " <> pretty t
+  pretty (App x y) = pretty x <> " " <> pretty y -- TODO: make this work for nested apps
+  pretty (Lam v e) = "(λ" <> v <> ". " <> pretty e <> ")"
+  pretty (Pi x t e) = "Π (" <> x <> " : " <> pretty t <> "). " <> pretty e
+  pretty Type = "Type"
+  pretty U = "U"
+
 -- Context maps variable names to types
 type Context = Map String Expr
 
+-- We split the typechecking rules across two functions: infer and check
+-- infer infers a type from an expression
+-- check checks that an expression has the given type
+
 infer :: Context -> Expr -> {expr :: Expr, type :: Expr}
 
+-- ANN
 infer ctx (Ann e t)
-  | (infer ctx t).type == Type =
-  let t' = nf t
-   in {expr: Ann e t', type: t'}
+  | check ctx t Type
+  = let t' = nf t
+     in if check ctx e t'
+        then {expr: Ann e t', type: t'}
+        else {expr: Ann e t', type: U}
 
+-- TYPE
 infer ctx Type = {expr: Type, type: Type}
 
+-- VAR
 infer ctx (Var v) =
   case lookup v ctx of
        Just t -> {expr: (Var v), type: t}
        Nothing -> {expr: (Var v), type: U}
 
+-- PI
 infer ctx (Pi x t e)
-  | (infer ctx t).type == Type
-  , (infer (insert x (infer ctx t).expr ctx) e).type == Type
+  | check ctx t Type
+  , check (insert x (infer ctx t).expr ctx) e Type
   = {expr: Pi x t e, type: Type}
 
-{-- infer ctx (App (Pi x t t') e') = --}
-{--   if (infer ctx e').type == t --}
-{--   then let t'' = substitute x t' e' --}
-{--         in {expr: App (Pi x t t') e', type: t''} --}
-{--   else {expr: App (Pi x t t') e', type: U} --}
-
+-- APP
 infer ctx (App e e') =
   case (infer ctx e).type of
        Pi x t t' ->
-         if (infer ctx e').type == t
+         if check ctx e' t
          then let t'' = substitute x t' e'
                in {expr: App e e', type: t''}
          else {expr: App e e', type: U}
        _ -> {expr: App e e', type: U}
 
+-- Fallthrough
+infer ctx e = {expr: e, type: U}
 
--- I'm unsure what the type of x should be here
-infer ctx (Lam x e) =
-  let ctx' = insert x U ctx
-      t' = (infer ctx' e).type
-   in {expr: Lam x e, type: Pi x U t'}
+check :: Context -> Expr -> Expr -> Boolean
+
+-- LAM
+check ctx (Lam x e) (Pi x' t t') =
+  let ctx' = insert x t ctx
+   in x == x' && check ctx' e t'
 
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
 -- 𝚪 ⊢ e :↓ t
--- TODO
+check ctx e t = (infer ctx e).type == t
 
-
--- Fallthrough
-infer ctx e = {expr: e, type: U}
-
--- Split the typechecking rules across two functions: infer and check
--- infer :: Context -> Expr -> Expr
--- check :: Context -> Expr -> Expr -> Bool
--- infer infers a type from an expression
--- check checks that an expression has the given type
 
 -- Return the normal form of the given expression, if there is one.
 -- If it doesn't have a normal form, this function will hang forever.

@@ -1,5 +1,6 @@
 <html>
   <head>
+    <meta charset="UTF-8">
     <title>Lambda Calculus Experiments</title>
     <script src="./output/app.js"></script>
     <style>
@@ -24,6 +25,7 @@
       <option value="systemt">System T</option>
       <option value="systemf">System F</option>
       <option value="hm">Hindley-Milner</option>
+      <option value="pi">λP</option>
     </select>
     <p></p>
     <textarea id="input" cols=80 rows=32>
@@ -40,7 +42,8 @@
         "stlc": "runSimple",
         "systemt": "runSystemT",
         "systemf": "runSystemF",
-        "hm": "runHM"
+        "hm": "runHM",
+        "pi": "runDependent"
       };
 
       let input_box = document.querySelector("#input");
