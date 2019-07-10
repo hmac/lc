@@ -18,7 +18,6 @@ data Expr = Var String          -- x
           | Lam String Expr     -- λ x. e
           | Pi String Expr Expr -- 𝚷 x : t. e
           | Type                -- *
-          | U                   -- unknown type
 
 derive instance eqExpr :: Eq Expr
 derive instance genericExpr :: Generic Expr _
@@ -32,7 +31,6 @@ instance prettyType :: Pretty Expr where
   pretty (Lam v e) = "(λ" <> v <> ". " <> pretty e <> ")"
   pretty (Pi x t e) = "Π (" <> x <> " : " <> pretty t <> "). " <> pretty e
   pretty Type = "Type"
-  pretty U = "U"
 
 -- Context maps variable names to types
 type Context = Map String Expr
@@ -122,7 +120,6 @@ reduceList expr = go (singleton expr)
 reduce :: Expr -> Expr
 reduce (Ann e t) = reduce e
 reduce Type = Type
-reduce U = U
 reduce (Pi x t e) = Pi x (reduce t) (reduce e)
 reduce (Var x) = Var x
 reduce (App (Lam v a) b) = substitute v a b
@@ -140,4 +137,3 @@ substitute v a b = go a
                      | otherwise = Lam v' (go e)
         go (Pi x t e) = Pi x (go t) (go e)
         go Type = Type
-        go U = U
