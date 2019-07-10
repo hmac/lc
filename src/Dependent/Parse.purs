@@ -69,7 +69,36 @@ expr' p = do
     Nothing -> pure e
 
 aexpr :: P Expr -> P Expr
-aexpr p = parens expr <|> lam p <|> pi p <|> var <|> ty
+aexpr p = parens expr <|> lam p <|> pi p <|> nats p <|> var <|> ty
+
+nats :: P Expr -> P Expr
+nats p = nat <|> zero <|> succ p <|> natElim p
+
+nat :: P Expr
+nat = string "Nat" *> pure Nat
+
+zero :: P Expr
+zero = string "Z" *> pure Zero
+
+succ :: P Expr -> P Expr
+succ p = do
+  _ <- string "S"
+  skipSpaces
+  e <- expr' p
+  pure $ Succ e
+
+natElim :: P Expr -> P Expr
+natElim p = do
+  _ <- string "natElim"
+  skipSpaces
+  m <- expr' p
+  skipSpaces
+  mz <- expr' p
+  skipSpaces
+  ms <- expr' p
+  skipSpaces
+  k <- expr' p
+  pure $ NatElim m mz ms k
 
 annotation :: P Expr -> P Expr
 annotation p = do

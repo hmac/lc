@@ -99,8 +99,8 @@ runDependent input = either identity identity $ do
   let res = runExcept (D.infer mempty main)
   case res of
     Left e -> pure e
-    Right {expr: e, type: t} ->
-      pure $ (pretty (D.nf e)) <> " : " <> pretty t
+    Right t ->
+      pure $ (pretty (D.nf main)) <> " : " <> pretty (D.nf t)
 
 constructOuterLet :: Map String HM.Expr -> HM.Expr -> HM.Expr
 constructOuterLet defs main = foldlWithIndex (\v acc e -> HM.Let v e acc) main defs
