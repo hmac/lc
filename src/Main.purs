@@ -14,7 +14,7 @@ import Data.String (null)
 import Data.Tuple (Tuple(..))
 import Data.Bifunctor (lmap, rmap)
 import Data.Map as Map
-import Data.Map (Map, lookup)
+import Data.Map (Map, lookup, delete)
 import Data.String.Regex (regex, test)
 import Control.Monad.Except (runExcept)
 
@@ -94,13 +94,16 @@ runHM input = either identity identity $ do
 runDependent :: String -> String
 runDependent input = either identity identity $ do
   defs <- lmap show $ D.Parse.parseProgram input
-  main <- note "'main' not found" (lookup "main" defs)
-  -- For now we just typecheck+eval main and ignore the rest
-  let res = runExcept (D.infer mempty main)
-  case res of
-    Left e -> pure e
-    Right t ->
-      pure $ (pretty (D.nf main)) <> " : " <> pretty (D.nf t)
+  let ectx = buildContext (\c e -> D.nfc c e) (delete "main" defs)
+      tctx = traverse (D.infer mempty) (delete "main" defs)
+  mainExpr <- note "'main' not found" (lookup "main" defs)
+  case runExcept tctx of
+    Left e -> pure $ e <> "\ncontext: " <> show defs
+    Right tctx ->
+      case runExcept (D.infer tctx mainExpr) of
+        Left e -> pure $ e <> "\ncontext: " <> show tctx
+        Right t ->
+          pure $ (pretty (D.nfc ectx mainExpr)) <> " : " <> pretty (D.nf t)
 
 constructOuterLet :: Map String HM.Expr -> HM.Expr -> HM.Expr
 constructOuterLet defs main = foldlWithIndex (\v acc e -> HM.Let v e acc) main defs

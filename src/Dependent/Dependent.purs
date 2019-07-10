@@ -2,7 +2,7 @@ module Dependent.Dependent where
 
 import Prelude
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Map (Map, lookup, insert)
 import Data.List (List(..), singleton)
 import Data.Generic.Rep (class Generic)
@@ -140,35 +140,41 @@ reducesTo from to =
 -- Return the normal form of the given expression, if there is one.
 -- If it doesn't have a normal form, this function will hang forever.
 nf :: Expr -> Expr
-nf e =
-  case reduceList e of
+nf e = nfc mempty e
+
+nfc :: Context -> Expr -> Expr
+nfc ctx e =
+  case reduceList ctx e of
        Cons x _ -> x
        Nil -> e
 
-reduceList :: Expr -> List Expr
-reduceList expr = go (singleton expr)
-  where go (Cons e es) = let e' = reduce e
+reduceList :: Context -> Expr -> List Expr
+reduceList ctx expr = go (singleton expr)
+  where go (Cons e es) = let e' = reduce ctx e
                           in if e' == e
                              then Cons e es
                              else go (Cons e' (Cons e es))
         go Nil = singleton expr
 
 -- Apply beta reduction once
-reduce :: Expr -> Expr
-reduce (Ann e t) = reduce e
-reduce Type = Type
-reduce (Pi x t e) = Pi x (reduce t) (reduce e)
-reduce (Var x) = Var x
-reduce (App (Lam v a) b) = substitute v a b
-reduce (App a b) = App (reduce a) (reduce b)
-reduce (Lam v a) = Lam v (reduce a)
-reduce Nat = Nat
-reduce Zero = Zero
-reduce (Succ e) = Succ (reduce e)
+reduce :: Context -> Expr -> Expr
+reduce c (Ann e t) = reduce c e
+reduce _ Type = Type
+reduce c (Pi x t e) = Pi x (reduce c t) (reduce c e)
+-- reduce ctx (App _ (Var _ v) b) = case lookup v ctx of
+--                                Just e -> app e b
+--                                Nothing -> (app (var v) (reduce ctx b))
+reduce ctx (Var v) = fromMaybe (Var v) (lookup v ctx)
+reduce _ (App (Lam v a) b) = substitute v a b
+reduce c (App a b) = App (reduce c a) (reduce c b)
+reduce c (Lam v a) = Lam v (reduce c a)
+reduce _ Nat = Nat
+reduce _ Zero = Zero
+reduce c (Succ e) = Succ (reduce c e)
 
-reduce (NatElim m mz ms Zero) = mz
-reduce (NatElim m mz ms (Succ l)) = App (App ms l) (NatElim m mz ms l)
-reduce (NatElim m mz ms k) = NatElim (reduce m) (reduce mz) (reduce ms) (reduce k)
+reduce _ (NatElim m mz ms Zero) = mz
+reduce _ (NatElim m mz ms (Succ l)) = App (App ms l) (NatElim m mz ms l)
+reduce c (NatElim m mz ms k) = NatElim (reduce c m) (reduce c mz) (reduce c ms) (reduce c k)
 
 -- (λv. a) b ⤳ a[b/v]
 substitute :: String -> Expr -> Expr -> Expr
