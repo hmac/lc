@@ -12,6 +12,7 @@ Current implementations:
 - [x] System T
 - [x] System F
 - [x] Hindley-Milner
+- [x] Dependently Typed Lambda Calculus (λ𝚷)
 
 ## Try it out
 
