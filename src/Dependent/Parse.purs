@@ -69,7 +69,10 @@ expr' p = do
     Nothing -> pure e
 
 aexpr :: P Expr -> P Expr
-aexpr p = parens expr <|> lam p <|> pi p <|> nats p <|> var <|> ty
+aexpr p = unit_ <|> parens expr <|> lam p <|> pi p <|> nats p <|> var <|> ty
+
+unit_ :: P Expr
+unit_ = (string "()" *> pure Unit) <|> (string "Unit" *> pure UnitT)
 
 nats :: P Expr -> P Expr
 nats p = nat <|> zero <|> succ p <|> natElim p
@@ -179,7 +182,7 @@ upperAlphas = [
 
 lowerAlphas :: Array Char
 lowerAlphas = [
-  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
+  '_', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
   ]
 
 digits :: Array Char

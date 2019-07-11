@@ -7,7 +7,7 @@ import Data.Map (Map, lookup, insert)
 import Data.List (List(..), singleton)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Control.Monad.Except (Except, runExcept, throwError)
+import Control.Monad.Except (Except, runExcept, throwError, withExcept)
 
 import Pretty (class Pretty, pretty)
 
@@ -18,6 +18,9 @@ data Expr = Var String          -- x
           | Lam String Expr     -- λ x. e
           | Pi String Expr Expr -- 𝚷 x : t. e
           | Type                -- *
+
+          | Unit
+          | UnitT
 
           -- Natural numbers
           | Nat
@@ -41,6 +44,8 @@ instance prettyType :: Pretty Expr where
   pretty (Lam v e) = "(λ" <> v <> "." <-> pretty e <> ")"
   pretty (Pi x t e) = "Π (" <> x <-> ":" <-> pretty t <> ")." <-> pretty e
   pretty Type = "Type"
+  pretty Unit = "()"
+  pretty UnitT = "Unit"
   pretty Nat = "Nat"
   pretty Zero = "Z"
   pretty (Succ e) = "S" <-> pretty e
@@ -54,13 +59,18 @@ type Context = Map String Expr
 -- infer infers a type from an expression
 -- check checks that an expression has the given type
 
+-- A helper to let us annotation errors with their source
+infixr 5 tagError as <?>
+tagError :: forall a. Except String a -> String -> Except String a
+tagError e s = withExcept (\err -> err <-> s) e
+
 infer :: Context -> Expr -> Except String Expr
 
 -- ANN
 infer ctx (Ann e t) = do
-  _ <- check ctx t Type
+  _ <- check ctx t Type <?> "(ANN)"
   let t' = nf t
-  _ <- check ctx e t'
+  _ <- check ctx e t' <?> "(ANN)"
   pure t'
 
 -- TYPE
@@ -77,7 +87,7 @@ infer ctx (Pi x t e) = do
   _ <- check ctx t Type
   let t' = nf t
   let ctx' = insert x t' ctx
-  _ <- check ctx' e Type
+  _ <- check ctx' e Type <?> "(PI)"
   pure Type
 
 -- APP
@@ -85,7 +95,7 @@ infer ctx (App e e') = do
   et <- infer ctx e
   case et of
     Pi x t t' -> do
-      _ <- check ctx e' t
+      _ <- check ctx e' t <?> "(APP)"
       let t'' = substitute x t' e'
       pure t''
     t -> throwError $ "expected " <> pretty e <> " to be a Pi type, but was inferred to be " <> pretty t
@@ -95,17 +105,21 @@ infer ctx (App e e') = do
 infer ctx Nat = pure Type
 infer ctx Zero = pure Nat
 infer ctx (Succ e) = do
-  _ <- check ctx e Nat
+  _ <- check ctx e Nat <?> "(SUCC)"
   pure Nat
 
 infer ctx (NatElim m mz ms k) = do
-  _ <- check ctx m (Pi "_" Nat Type)
+  _ <- check ctx m (Pi "_" Nat Type) <?> "(NATELIM)"
   let t = nf (App m Zero)
-  _ <- check ctx mz t
+  _ <- check ctx mz t <?> "(NATELIM)"
   let t' = nf (Pi "l" Nat (Pi "_" (App m k) (App m (Succ (Var "l")))))
-  _ <- check ctx ms t'
-  _ <- check ctx k Nat
+  _ <- check ctx ms t' <?> "(NATELIM)"
+  _ <- check ctx k Nat <?> "(NATELIM)"
   pure $ nf (App m k) -- investigate this
+
+-- Unit
+infer _ UnitT = pure Type
+infer _ Unit = pure UnitT
 
 -- Fallthrough
 infer ctx e = throwError $ "could not infer type of " <> pretty e
@@ -113,11 +127,17 @@ infer ctx e = throwError $ "could not infer type of " <> pretty e
 check :: Context -> Expr -> Expr -> Except String Unit
 
 -- LAM
-check ctx (Lam x e) (Pi x' t t')
-  = do
-      let ctx' = insert x t ctx
-      _ <- check ctx' e t'
-      pure unit
+-- We use explicit names for lambda-abstracted variables instead of de Bruijn indices.
+-- Because of this, we need to insert into the context the type of the variable
+-- in the Pi type *and* and the type of the variable in the lambda abstraction.
+-- I'm not 100% sure this is valid, since they should really refer to the same
+-- thing, but it seems to work for now.
+check ctx (Lam x e) (Pi x' t t') = do
+  _ <- check ctx (nf t) Type <?> "(LAM)"
+  let ctx' = insert x t ctx
+  let ctx'' = insert x' t ctx'
+  _ <- check ctx'' e t' <?> "(LAM)"
+  pure unit
 
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
@@ -128,7 +148,9 @@ check ctx e t
       Right t' ->
         if t' == t
           then pure unit
-          else throwError $ "could not infer that " <> pretty e <> " has type " <> pretty t
+          else throwError $ "could not infer that " <> pretty e <>
+                            " has type " <> pretty t <->
+                            "(inferred type" <-> pretty t' <-> "instead)"
 
 -- remove if unused
 reducesTo :: Expr -> Expr -> Except String Unit
@@ -168,6 +190,9 @@ reduce ctx (Var v) = fromMaybe (Var v) (lookup v ctx)
 reduce _ (App (Lam v a) b) = substitute v a b
 reduce c (App a b) = App (reduce c a) (reduce c b)
 reduce c (Lam v a) = Lam v (reduce c a)
+reduce c Unit = Unit
+reduce c UnitT = UnitT
+
 reduce _ Nat = Nat
 reduce _ Zero = Zero
 reduce c (Succ e) = Succ (reduce c e)
@@ -187,6 +212,8 @@ substitute v a b = go a
                       | otherwise = Lam v' (go e)
         go (Pi x t e) = Pi x (go t) (go e)
         go Type = Type
+        go Unit = Unit
+        go UnitT = UnitT
         go Nat = Nat
         go Zero = Zero
         go (Succ e) = Succ (go e)
