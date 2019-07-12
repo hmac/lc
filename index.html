@@ -109,5 +109,13 @@ mult = \n : (N -> N) -> N -> N. \m : (N -> N) -> N -> N. \f : N -> N. \x : N. n 
 plus = \m : Nat. \n : Nat. Rec (\x : Nat. \k : Nat. Succ k) m n
 mult = \m : Nat. \n : Nat. Rec (\x : Nat. \k : Nat. plus k m) 0 n
     </pre>
+    <p>λP Prelude</p>
+    <pre>
+plus = (\n. \m. natElim (\_. Nat) n (\k. \rec. S rec) m) : forall (n : Nat). forall (m : Nat). Nat
+mult = (\n. \m. natElim (\_. Nat) Z (\k. \recn. plus recn n) m) : forall (n : Nat). forall (m : Nat). Nat
+
+-- N.B. this doesn't quite work yet
+append = (\a. \k1. \v1. \k2. \v2. vecElim a (\m. \_. Vec a (plus k1 m)) v1 (\m. \v. \vs. \rec. VCons a (S m) v rec) k2 v2) : forall (a : Type). forall (k1 : Nat). forall (v1 : Vec a k1). forall (k2 : Nat). forall (v2: Vec a k2). Vec a (plus k1 k2) 
+    </pre>
   </body>
 </html>
