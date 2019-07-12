@@ -7,17 +7,20 @@ import Data.Map (Map, lookup, insert)
 import Data.List (List(..), singleton)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Control.Monad.Except (Except, runExcept, throwError, withExcept)
+import Control.Monad.Except (Except, ExceptT, runExcept, throwError, withExcept)
+import Control.Monad.Reader (Reader, runReader, ask)
+import Data.Identity (Identity)
+import Data.Foldable (foldr)
 
 import Pretty (class Pretty, pretty)
 
 -- Values, Types and Kinds are all Exprs
-data Expr = Var String          -- x
-          | Ann Expr Expr       -- an expr annotated with a type; (e : t)
-          | App Expr Expr       -- e e'
-          | Lam String Expr     -- λ x. e
-          | Pi String Expr Expr -- 𝚷 x : t. e
-          | Type                -- *
+data Expr = Var String                  -- x
+          | Ann Expr Expr               -- an expr annotated with a type; (e : t)
+          | App Expr Expr               -- e e'
+          | Lam String Expr             -- λ x. e
+          | Pi String Expr Expr         -- 𝚷 x : t. e
+          | Type                        -- *
 
           | Unit
           | UnitT
@@ -28,6 +31,21 @@ data Expr = Var String          -- x
           | Succ Expr
           | NatElim Expr Expr Expr Expr -- natElim m mz ms k
 
+          -- Vectors
+          | Vec Expr Expr
+          | VNil Expr                   -- Nil : 𝚷 (a : Type). Vec a Zero
+          | VCons Expr Expr Expr Expr   -- Cons : 𝚷 (a : Type). 𝚷 (k : Nat).
+                                        --        a -> Vec a k -> Vec a (Succ k)
+          | VecElim Expr Expr Expr Expr Expr Expr
+          -- vecElim : 𝚷(a : Type).
+          --           𝚷(m : 𝚷(k : Nat). 𝚷(_ : Vec a k). Type).
+          --           m Zero (VNil a) ->
+          --           (𝚷(l : Nat). 𝚷(x : a). 𝚷(xs : Vec a l).
+          --            m l xs ->
+          --            m (Succ l) (VCons a l x xs)).
+          --           𝚷(k : Nat). 𝚷(xs : Vec a k).
+          --           m k xs
+
 derive instance eqExpr :: Eq Expr
 derive instance genericExpr :: Generic Expr _
 instance showExpr :: Show Expr where
@@ -36,6 +54,9 @@ instance showExpr :: Show Expr where
 infixr 5 space as <->
 space :: String -> String -> String
 space a b = a <> " " <> b
+
+parens :: String -> String
+parens x = "(" <> x <> ")"
 
 instance prettyType :: Pretty Expr where
   pretty (Var v) = v
@@ -49,8 +70,11 @@ instance prettyType :: Pretty Expr where
   pretty Nat = "Nat"
   pretty Zero = "Z"
   pretty (Succ e) = "S" <-> pretty e
-  pretty (NatElim m mz ms k)
-    = "natElim" <-> pretty m <-> pretty mz <-> pretty ms <-> pretty k
+  pretty (NatElim m mz ms k) = foldr (<->) "natElim" (map pretty [m, mz, ms, k])
+  pretty (Vec a k) = "Vec" <-> pretty a <-> parens (pretty k)
+  pretty (VNil a) = "[]"
+  pretty (VCons a k x xs) = pretty x <-> "::" <-> pretty xs
+  pretty (VecElim a m mz ms k xs) = foldr (<->) "vecElim" (map pretty [a, m, mz, ms, k, xs])
 
 -- Context maps variable names to types
 type Context = Map String Expr
@@ -64,67 +88,101 @@ infixr 5 tagError as <?>
 tagError :: forall a. Except String a -> String -> Except String a
 tagError e s = withExcept (\err -> err <-> s) e
 
-infer :: Context -> Expr -> Except String Expr
+type Env = {typeContext :: Context, valContext :: Context}
+infer :: Context -> Context -> Expr -> ExceptT String Identity Expr
 
 -- ANN
-infer ctx (Ann e t) = do
-  _ <- check ctx t Type <?> "(ANN)"
-  let t' = nf t
-  _ <- check ctx e t' <?> "(ANN)"
+infer ex ctx (Ann e t) = do
+  _ <- check ex ctx t Type <?> "(ANN)"
+  let t' = nfc ex t
+  _ <- check ex ctx e t' <?> "(ANN)"
   pure t'
 
 -- TYPE
-infer ctx Type = pure Type
+infer _ ctx Type = pure Type
 
 -- VAR
-infer ctx (Var v) =
+infer _ ctx (Var v) =
   case lookup v ctx of
     Just t -> pure t
-    Nothing -> throwError $ "could not determine type of variable " <> v
+    Nothing -> throwError $ "could not determine type of variable " <> v <> "\n" <> show ctx
 
 -- PI
-infer ctx (Pi x t e) = do
-  _ <- check ctx t Type
-  let t' = nf t
+infer ex ctx (Pi x t e) = do
+  _ <- check ex ctx t Type
+  let t' = nfc ex t
   let ctx' = insert x t' ctx
-  _ <- check ctx' e Type <?> "(PI)"
+  _ <- check ex ctx' e Type <?> "(PI)"
   pure Type
 
 -- APP
-infer ctx (App e e') = do
-  et <- infer ctx e
+infer ex ctx (App e e') = do
+  et <- infer ex ctx e
   case et of
     Pi x t t' -> do
-      _ <- check ctx e' t <?> "(APP)"
+      _ <- check ex ctx e' t <?> "(APP)"
       let t'' = substitute x t' e'
       pure t''
     t -> throwError $ "expected " <> pretty e <> " to be a Pi type, but was inferred to be " <> pretty t
 
 -- Nats
 
-infer ctx Nat = pure Type
-infer ctx Zero = pure Nat
-infer ctx (Succ e) = do
-  _ <- check ctx e Nat <?> "(SUCC)"
+infer _ ctx Nat = pure Type
+infer _ ctx Zero = pure Nat
+infer ex ctx (Succ e) = do
+  _ <- check ex ctx e Nat <?> "(SUCC)"
   pure Nat
 
-infer ctx (NatElim m mz ms k) = do
-  _ <- check ctx m (Pi "_" Nat Type) <?> "(NATELIM)"
-  let t = nf (App m Zero)
-  _ <- check ctx mz t <?> "(NATELIM)"
-  let t' = nf (Pi "l" Nat (Pi "_" (App m k) (App m (Succ (Var "l")))))
-  _ <- check ctx ms t' <?> "(NATELIM)"
-  _ <- check ctx k Nat <?> "(NATELIM)"
-  pure $ nf (App m k) -- investigate this
+infer ex ctx (NatElim m mz ms k) = do
+  _ <- check ex ctx m (Pi "_" Nat Type) <?> "(NATELIM)"
+  let t = nfc ex (App m Zero)
+  _ <- check ex ctx mz t <?> "(NATELIM)"
+  let t' = nfc ex (Pi "l" Nat (Pi "_" (App m k) (App m (Succ (Var "l")))))
+  _ <- check ex ctx ms t' <?> "(NATELIM)"
+  _ <- check ex ctx k Nat <?> "(NATELIM)"
+  pure $ nfc ex (App m k)
+
+-- Vecs
+
+infer _ ctx (Vec a k) = pure Type
+infer ex ctx (VNil a) = do
+  _ <- check ex ctx a Type
+  pure (Vec (nfc ex a) Zero)
+infer ex ctx (VCons a k x xs) = do
+  _ <- check ex ctx a Type <?> "(VCONS)"
+  _ <- check ex ctx k Nat <?> "(VCONS)"
+  let a' = nfc ex a
+      k' = nfc ex k
+  _ <- check ex ctx x a' <?> "(VCONS)"
+  _ <- check ex ctx xs (Vec a' k') <?> "(VCONS)"
+  pure $ Vec a' (Succ k')
+infer ex ctx (VecElim a m mz ms k xs) = do
+  _ <- check ex ctx a Type
+  let a' = nfc ex a
+  _ <- check ex ctx m $ Pi "k" Nat (Pi "_" (Vec a' (Var "k")) Type)
+  let m' = nfc ex m
+  _ <- check ex ctx mz $ nfc ex $ App (App m' Zero) (VNil a')
+  _ <- check ex ctx ms $
+    Pi "l" Nat
+      (Pi "x" a'
+      (Pi "xs" (Vec a' (Var "l"))
+      (Pi "_" (App (App m' (Var "l")) (Var "xs"))
+              (App (App m' (Succ (Var "l")))
+                   (VCons a' (Var "l") (Var "x") (Var "xs"))))))
+  _ <- check ex ctx k Nat
+  let k' = nfc ex k
+  _ <- check ex ctx xs (Vec a k')
+  let xs' = nfc ex xs
+  pure $ App (App m' k') xs'
 
 -- Unit
-infer _ UnitT = pure Type
-infer _ Unit = pure UnitT
+infer _ _ UnitT = pure Type
+infer _ _ Unit = pure UnitT
 
 -- Fallthrough
-infer ctx e = throwError $ "could not infer type of " <> pretty e
+infer _ ctx e = throwError $ "could not infer type of " <> pretty e
 
-check :: Context -> Expr -> Expr -> Except String Unit
+check :: Context -> Context -> Expr -> Expr -> Except String Unit
 
 -- LAM
 -- We use explicit names for lambda-abstracted variables instead of de Bruijn indices.
@@ -132,32 +190,28 @@ check :: Context -> Expr -> Expr -> Except String Unit
 -- in the Pi type *and* and the type of the variable in the lambda abstraction.
 -- I'm not 100% sure this is valid, since they should really refer to the same
 -- thing, but it seems to work for now.
-check ctx (Lam x e) (Pi x' t t') = do
-  _ <- check ctx (nf t) Type <?> "(LAM)"
+check ex ctx (Lam x e) (Pi x' t t') = do
+  _ <- check ex ctx (nfc ex t) Type <?> "(LAM)"
   let ctx' = insert x t ctx
   let ctx'' = insert x' t ctx'
-  _ <- check ctx'' e t' <?> "(LAM)"
+  _ <- check ex ctx'' e t' <?> "(LAM)"
   pure unit
 
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
 -- 𝚪 ⊢ e :↓ t
-check ctx e t
-  = case runExcept (infer ctx e) of
+check ex ctx e t
+  = case runExcept (infer ex ctx e) of
       Left err -> throwError err
       Right t' ->
-        if t' == t
-          then pure unit
-          else throwError $ "could not infer that " <> pretty e <>
-                            " has type " <> pretty t <->
-                            "(inferred type" <-> pretty t' <-> "instead)"
-
--- remove if unused
-reducesTo :: Expr -> Expr -> Except String Unit
-reducesTo from to =
-  if nf from == to
-  then pure unit
-  else throwError $ "expected" <-> pretty from <-> "to reduce to" <-> pretty to
+        let t'n = nfc ex t'
+            tn = nfc ex t
+         in
+          if t'n == tn
+            then pure unit
+            else throwError $ "could not infer that " <> pretty (nfc ex e) <>
+                              " has type " <> pretty tn <->
+                              "(inferred type" <-> pretty t'n <-> "instead)"
 
 -- Return the normal form of the given expression, if there is one.
 -- If it doesn't have a normal form, this function will hang forever.
@@ -201,6 +255,15 @@ reduce _ (NatElim m mz ms Zero) = mz
 reduce _ (NatElim m mz ms (Succ l)) = App (App ms l) (NatElim m mz ms l)
 reduce c (NatElim m mz ms k) = NatElim (reduce c m) (reduce c mz) (reduce c ms) (reduce c k)
 
+reduce c (Vec a k) = Vec (reduce c a) (reduce c k)
+reduce c (VNil a) = VNil (reduce c a)
+reduce c (VCons a k x xs) = VCons (reduce c a) (reduce c k) (reduce c x) (reduce c xs)
+
+reduce c (VecElim a m mz ms Zero xs) = mz
+reduce c (VecElim a m mz ms (Succ k) (VCons _ _ x xs))
+  = App (App (App (App ms k) x) xs) (VecElim a m mz ms k xs)
+reduce c (VecElim a m mz ms k xs) = VecElim (reduce c a) (reduce c m) (reduce c mz) (reduce c ms) (reduce c k) (reduce c xs)
+
 -- (λv. a) b ⤳ a[b/v]
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = go a
@@ -218,3 +281,7 @@ substitute v a b = go a
         go Zero = Zero
         go (Succ e) = Succ (go e)
         go (NatElim m mz ms k) = NatElim (go m) (go mz) (go ms) (go k)
+        go (Vec t k) = Vec (go t) (go k)
+        go (VNil t) = VNil (go t)
+        go (VCons t k x xs) = VCons (go t) (go k) (go x) (go xs)
+        go (VecElim t m mz ms k xs) = VecElim (go t) (go m) (go mz) (go ms) (go k) (go xs)

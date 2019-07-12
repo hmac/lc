@@ -95,12 +95,12 @@ runDependent :: String -> String
 runDependent input = either identity identity $ do
   defs <- lmap show $ D.Parse.parseProgram input
   let ectx = buildContext (\c e -> D.nfc c e) (delete "main" defs)
-      tctx = traverse (D.infer mempty) (delete "main" defs)
+      tctx = traverse (D.infer ectx mempty) (delete "main" defs)
   mainExpr <- note "'main' not found" (lookup "main" defs)
   case runExcept tctx of
     Left e -> pure $ e <> "\ncontext: " <> show defs
     Right tctx ->
-      case runExcept (D.infer tctx mainExpr) of
+      case runExcept (D.infer ectx tctx mainExpr) of
         Left e -> pure $ e <> "\ncontext: " <> show tctx
         Right t ->
           pure $ (pretty (D.nfc ectx mainExpr)) <> " : " <> pretty (D.nf t)

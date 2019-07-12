@@ -69,7 +69,7 @@ expr' p = do
     Nothing -> pure e
 
 aexpr :: P Expr -> P Expr
-aexpr p = unit_ <|> parens expr <|> lam p <|> pi p <|> nats p <|> var <|> ty
+aexpr p = unit_ <|> parens expr <|> lam p <|> pi p <|> nats p <|> vecs p <|> var <|> ty
 
 unit_ :: P Expr
 unit_ = (string "()" *> pure Unit) <|> (string "Unit" *> pure UnitT)
@@ -87,21 +87,70 @@ succ :: P Expr -> P Expr
 succ p = do
   _ <- string "S"
   skipSpaces
-  e <- expr' p
+  e <- aexpr p
   pure $ Succ e
 
 natElim :: P Expr -> P Expr
 natElim p = do
   _ <- string "natElim"
   skipSpaces
-  m <- expr' p
+  m <- aexpr p
   skipSpaces
-  mz <- expr' p
+  mz <- aexpr p
   skipSpaces
-  ms <- expr' p
+  ms <- aexpr p
   skipSpaces
-  k <- expr' p
+  k <- aexpr p
   pure $ NatElim m mz ms k
+
+vecs :: P Expr -> P Expr
+vecs p = vec p <|> vnil p <|> vcons p <|> vecElim p
+
+vec :: P Expr -> P Expr
+vec p = do
+  _ <- string "Vec"
+  skipSpaces
+  a <- aexpr p
+  skipSpaces
+  k <- aexpr p
+  pure $ Vec a k
+
+vnil :: P Expr -> P Expr
+vnil p = do
+  _ <- string "VNil"
+  skipSpaces
+  a <- aexpr p
+  pure $ VNil a
+
+vcons :: P Expr -> P Expr
+vcons p = do
+  _ <- string "VCons"
+  skipSpaces
+  a <- aexpr p
+  skipSpaces
+  k <- aexpr p
+  skipSpaces
+  x <- aexpr p
+  skipSpaces
+  xs <- aexpr p
+  pure $ VCons a k x xs
+
+vecElim :: P Expr -> P Expr
+vecElim p = do
+  _ <- string "vecElim"
+  skipSpaces
+  a <- aexpr p
+  skipSpaces
+  m <- aexpr p
+  skipSpaces
+  mz <- aexpr p
+  skipSpaces
+  ms <- aexpr p
+  skipSpaces
+  k <- aexpr p
+  skipSpaces
+  xs <- aexpr p
+  pure $ VecElim a m mz ms k xs
 
 annotation :: P Expr -> P Expr
 annotation p = do
