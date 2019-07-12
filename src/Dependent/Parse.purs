@@ -15,6 +15,7 @@ import Data.List (List(..), foldl)
 import Data.Maybe (Maybe(..))
 import Data.Map (Map)
 import Data.Map as Map
+import Data.Tuple (Tuple(..))
 
 import Dependent.Dependent (Expr(..))
 
@@ -26,10 +27,10 @@ type P = Parser String
 parseExpr :: String -> Either ParseError Expr
 parseExpr input = runParser input (expr)
 
-parseProgram :: String -> Either ParseError (Map String Expr)
+parseProgram :: String -> Either ParseError (List (Tuple String Expr))
 parseProgram input = do
   defs <- runParser input program
-  pure $ foldl (\m (Def s e) -> Map.insert s e m) mempty defs
+  pure $ map (\(Def s e) -> Tuple s e) defs
 
 -- A program is a sequence of definitions
 -- One definition should be 'main'

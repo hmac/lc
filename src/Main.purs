@@ -8,13 +8,16 @@ import Data.Maybe
 import Data.String.Utils (lines)
 import Data.List (List(..), filter, fromFoldable, reverse, partition, foldl)
 import Data.Traversable (traverse, foldr)
+import Data.Foldable (foldM)
+import Data.FoldableWithIndex (foldWithIndexM)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.FoldableWithIndex (foldlWithIndex, foldrWithIndex, class FoldableWithIndex)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
+import Data.Tuple as Tuple
 import Data.Bifunctor (lmap, rmap)
 import Data.Map as Map
-import Data.Map (Map, lookup, delete)
+import Data.Map (Map, delete, lookup)
 import Data.String.Regex (regex, test)
 import Control.Monad.Except (runExcept)
 
@@ -94,16 +97,22 @@ runHM input = either identity identity $ do
 runDependent :: String -> String
 runDependent input = either identity identity $ do
   defs <- lmap show $ D.Parse.parseProgram input
-  let ectx = buildContext (\c e -> D.nfc c e) (delete "main" defs)
-      tctx = traverse (D.infer ectx mempty) (delete "main" defs)
-  mainExpr <- note "'main' not found" (lookup "main" defs)
-  case runExcept tctx of
+
+  -- build up the environment from the parsed definitions
+  let env = foldM (\env (Tuple name def) -> do -- this is in the Either monad
+            let valContext = Map.insert name (D.nfc env.valContext def) env.valContext
+            type_ <- D.runInfer env def
+            let typeContext = Map.insert name type_ env.typeContext
+            pure {valContext: valContext, typeContext: typeContext}
+             ) {valContext: mempty, typeContext: mempty} defs
+  mainExpr <- note "'main' not found" (Tuple.lookup "main" defs)
+  case env of
     Left e -> pure $ e <> "\ncontext: " <> show defs
-    Right tctx ->
-      case runExcept (D.infer ectx tctx mainExpr) of
-        Left e -> pure $ e <> "\ncontext: " <> show tctx
+    Right env ->
+      case D.runInfer env mainExpr of
+        Left e -> pure $ e <> "\n\nEnv:\n " <> show env
         Right t ->
-          pure $ (pretty (D.nfc ectx mainExpr)) <> " : " <> pretty (D.nf t)
+          pure $ (pretty (D.nfc env.valContext mainExpr)) <> " : " <> pretty (D.nf t)
 
 constructOuterLet :: Map String HM.Expr -> HM.Expr -> HM.Expr
 constructOuterLet defs main = foldlWithIndex (\v acc e -> HM.Let v e acc) main defs
