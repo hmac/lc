@@ -8,6 +8,7 @@ import Test.Simple.Parse as Test.Simple.Parse
 import Test.SystemF.Parse as Test.SystemF.Parse
 import Test.SystemF as Test.SystemF
 import Test.HM as Test.HM
+import Test.Dependent as Test.Dependent
 
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (run)
@@ -19,3 +20,4 @@ main = run [consoleReporter] do
   Test.SystemF.Parse.main
   Test.SystemF.main
   Test.HM.main
+  Test.Dependent.main

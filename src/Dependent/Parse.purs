@@ -13,8 +13,6 @@ import Control.Alt ((<|>))
 import Data.String.CodeUnits (fromCharArray)
 import Data.List (List(..), foldl)
 import Data.Maybe (Maybe(..))
-import Data.Map (Map)
-import Data.Map as Map
 import Data.Tuple (Tuple(..))
 
 import Dependent.Dependent (Expr(..))
@@ -70,7 +68,7 @@ expr' p = do
     Nothing -> pure e
 
 aexpr :: P Expr -> P Expr
-aexpr p = unit_ <|> parens expr <|> lam p <|> pi p <|> nats p <|> vecs p <|> var <|> ty
+aexpr p = ty <|> unit_ <|> parens expr <|> lam p <|> pi p <|> nats p <|> vecs p <|> var
 
 unit_ :: P Expr
 unit_ = (string "()" *> pure Unit) <|> (string "Unit" *> pure UnitT)
